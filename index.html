@@ -193,6 +193,35 @@
               </div>
               <button id="protectStorageBtn" type="button">保护数据</button>
             </div>
+            <div class="cloud-box" id="cloudBox">
+              <div>
+                <h2>云端词库</h2>
+                <p id="cloudStatus">还没有连接云端。</p>
+              </div>
+              <label>
+                <span>后端地址</span>
+                <input id="cloudUrlInput" autocomplete="off" inputmode="url" placeholder="https://你的后端地址" />
+              </label>
+              <label>
+                <span>同步码</span>
+                <div class="sync-code-row">
+                  <input id="syncCodeInput" autocomplete="off" placeholder="自己保存好这个码" />
+                  <button id="generateSyncCodeBtn" type="button">生成</button>
+                </div>
+              </label>
+              <div class="toggle-row">
+                <span>保存后自动上传</span>
+                <label class="switch">
+                  <input id="autoSyncToggle" type="checkbox" />
+                  <span></span>
+                </label>
+              </div>
+              <div class="split-actions cloud-actions">
+                <button id="saveCloudSettingsBtn" type="button">保存设置</button>
+                <button id="uploadCloudBtn" type="button">上传</button>
+                <button id="downloadCloudBtn" type="button">恢复</button>
+              </div>
+            </div>
           </section>
         </section>
       </main>

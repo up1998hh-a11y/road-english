@@ -1,6 +1,7 @@
 const STORAGE_KEY = "drive-english-v1";
 const SETTINGS_KEY = "drive-english-settings-v1";
 const TRANSLATION_CACHE_KEY = "drive-english-translation-cache-v1";
+const CLOUD_SETTINGS_KEY = "drive-english-cloud-settings-v1";
 const DB_NAME = "drive-english-db";
 const DB_VERSION = 1;
 const WORDS_STORE = "words";
@@ -129,9 +130,16 @@ const defaultSettings = {
   hideKnown: false,
 };
 
+const defaultCloudSettings = {
+  apiUrl: "",
+  syncCode: "",
+  autoSync: false,
+};
+
 const state = {
   words: loadWords(),
   settings: loadSettings(),
+  cloud: loadCloudSettings(),
   index: 0,
   playing: false,
   speaking: false,
@@ -143,6 +151,8 @@ const state = {
   storageAvailable: true,
   db: null,
   durableStorage: false,
+  syncTimer: null,
+  syncing: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -210,6 +220,14 @@ const els = {
   shadowToggle: $("#shadowToggle"),
   storageStatus: $("#storageStatus"),
   protectStorageBtn: $("#protectStorageBtn"),
+  cloudStatus: $("#cloudStatus"),
+  cloudUrlInput: $("#cloudUrlInput"),
+  syncCodeInput: $("#syncCodeInput"),
+  generateSyncCodeBtn: $("#generateSyncCodeBtn"),
+  autoSyncToggle: $("#autoSyncToggle"),
+  saveCloudSettingsBtn: $("#saveCloudSettingsBtn"),
+  uploadCloudBtn: $("#uploadCloudBtn"),
+  downloadCloudBtn: $("#downloadCloudBtn"),
 };
 
 function loadWords() {
@@ -237,6 +255,17 @@ function loadTranslationCache() {
     return JSON.parse(window.localStorage.getItem(TRANSLATION_CACHE_KEY) || "{}");
   } catch {
     return {};
+  }
+}
+
+function loadCloudSettings() {
+  try {
+    return {
+      ...defaultCloudSettings,
+      ...JSON.parse(window.localStorage.getItem(CLOUD_SETTINGS_KEY) || "{}"),
+    };
+  } catch {
+    return { ...defaultCloudSettings };
   }
 }
 
@@ -316,9 +345,11 @@ function saveWords() {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.words));
     state.storageAvailable = true;
+    scheduleCloudSync();
     return true;
   } catch {
     state.storageAvailable = false;
+    scheduleCloudSync();
     return Boolean(state.db);
   }
 }
@@ -343,6 +374,15 @@ function saveTranslationCache() {
   }
   try {
     window.localStorage.setItem(TRANSLATION_CACHE_KEY, JSON.stringify(state.translationCache));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveCloudSettings() {
+  try {
+    window.localStorage.setItem(CLOUD_SETTINGS_KEY, JSON.stringify(state.cloud));
     return true;
   } catch {
     return false;
@@ -710,6 +750,117 @@ function setSingleStatus(message) {
 
 function setAppStatus(message) {
   els.appStatus.textContent = message;
+}
+
+function setCloudStatus(message) {
+  els.cloudStatus.textContent = message;
+}
+
+function normalizeApiUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function getCloudEndpoint() {
+  const apiUrl = normalizeApiUrl(state.cloud.apiUrl);
+  if (!apiUrl) throw new Error("先填写后端地址。");
+  if (!state.cloud.syncCode.trim()) throw new Error("先填写同步码。");
+  return `${apiUrl}/api/words/${encodeURIComponent(state.cloud.syncCode.trim())}`;
+}
+
+function createSyncCode() {
+  const bytes = new Uint8Array(6);
+  if (window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    bytes.forEach((_, index) => {
+      bytes[index] = Math.floor(Math.random() * 256);
+    });
+  }
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function applyCloudSettingsFromInputs() {
+  state.cloud.apiUrl = normalizeApiUrl(els.cloudUrlInput.value);
+  state.cloud.syncCode = els.syncCodeInput.value.trim();
+  state.cloud.autoSync = els.autoSyncToggle.checked;
+  saveCloudSettings();
+  updateCloudUi();
+}
+
+function updateCloudUi() {
+  els.cloudUrlInput.value = state.cloud.apiUrl;
+  els.syncCodeInput.value = state.cloud.syncCode;
+  els.autoSyncToggle.checked = state.cloud.autoSync;
+  const ready = Boolean(state.cloud.apiUrl && state.cloud.syncCode);
+  if (!ready) {
+    setCloudStatus("填写后端地址和同步码后，可以把词库保存到云端。");
+  } else if (!els.cloudStatus.textContent || els.cloudStatus.textContent === "还没有连接云端。") {
+    setCloudStatus(state.cloud.autoSync ? "云端已配置，保存后会自动上传。" : "云端已配置，可以手动上传或恢复。");
+  }
+}
+
+function scheduleCloudSync() {
+  if (!state.cloud.autoSync || !state.cloud.apiUrl || !state.cloud.syncCode) return;
+  window.clearTimeout(state.syncTimer);
+  state.syncTimer = window.setTimeout(() => {
+    uploadToCloud({ quiet: true });
+  }, 900);
+}
+
+async function uploadToCloud({ quiet = false } = {}) {
+  if (state.syncing) return;
+  applyCloudSettingsFromInputs();
+  const endpoint = getCloudEndpoint();
+  state.syncing = true;
+  if (!quiet) setCloudStatus("正在上传词库…");
+  try {
+    const response = await fetch(endpoint, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        words: state.words,
+        settings: state.settings,
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "上传失败。");
+    setCloudStatus(`已上传 ${state.words.length} 个词条到云端。`);
+  } finally {
+    state.syncing = false;
+  }
+}
+
+function mergeWords(localWords, remoteWords) {
+  const byKey = new Map();
+  [...remoteWords, ...localWords].forEach((word) => {
+    if (!word || !word.term) return;
+    const key = String(word.id || word.term).toLowerCase();
+    byKey.set(key, {
+      ...word,
+      id: word.id || createId(),
+      createdAt: word.createdAt || new Date().toISOString(),
+    });
+  });
+  return Array.from(byKey.values()).sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+}
+
+async function downloadFromCloud() {
+  applyCloudSettingsFromInputs();
+  const endpoint = getCloudEndpoint();
+  setCloudStatus("正在从云端恢复…");
+  const response = await fetch(endpoint);
+  const data = await response.json().catch(() => ({}));
+  if (response.status === 404) {
+    setCloudStatus("云端还没有这个同步码的数据，可以先点“上传”。");
+    return;
+  }
+  if (!response.ok) throw new Error(data.error || "恢复失败。");
+  const remoteWords = Array.isArray(data.words) ? data.words : [];
+  state.words = mergeWords(state.words, remoteWords);
+  saveWords();
+  updateScreen();
+  setCloudStatus(`已从云端恢复 ${remoteWords.length} 个词条，本机现在共 ${state.words.length} 个。`);
 }
 
 function setMoreFields(open) {
@@ -1202,6 +1353,38 @@ function bindEvents() {
 
   els.protectStorageBtn.addEventListener("click", protectStorage);
 
+  els.generateSyncCodeBtn.addEventListener("click", () => {
+    els.syncCodeInput.value = createSyncCode();
+    applyCloudSettingsFromInputs();
+    setCloudStatus("已生成同步码，请自己保存好。换手机时用同一个同步码恢复。");
+  });
+
+  els.saveCloudSettingsBtn.addEventListener("click", () => {
+    applyCloudSettingsFromInputs();
+    setCloudStatus(state.cloud.apiUrl && state.cloud.syncCode ? "云端设置已保存。" : "请填写后端地址和同步码。");
+  });
+
+  els.uploadCloudBtn.addEventListener("click", async () => {
+    try {
+      await uploadToCloud();
+    } catch (error) {
+      setCloudStatus(error.message || "上传失败，请检查后端地址。");
+    }
+  });
+
+  els.downloadCloudBtn.addEventListener("click", async () => {
+    try {
+      await downloadFromCloud();
+    } catch (error) {
+      setCloudStatus(error.message || "恢复失败，请检查后端地址。");
+    }
+  });
+
+  els.autoSyncToggle.addEventListener("change", () => {
+    applyCloudSettingsFromInputs();
+    setCloudStatus(state.cloud.autoSync ? "已开启自动上传。" : "已关闭自动上传。");
+  });
+
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     state.deferredInstallPrompt = event;
@@ -1240,6 +1423,7 @@ async function init() {
     registerServiceWorker();
     updateScreen();
     updateStorageStatus();
+    updateCloudUi();
   } catch (error) {
     setAppStatus(`页面初始化遇到问题：${error.message}`);
   }
