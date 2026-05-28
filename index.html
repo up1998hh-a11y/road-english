@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f4ef" />
+    <title>路上英语</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Drive English</p>
+          <h1>路上英语</h1>
+        </div>
+        <button class="icon-button install-help" id="installBtn" type="button" aria-label="手机使用方式">
+          手机
+        </button>
+      </header>
+
+      <main>
+        <section class="panel player-panel" aria-labelledby="playerTitle">
+          <div class="player-head">
+            <div>
+              <p class="section-label" id="playerTitle">现在播放</p>
+              <p class="subtle" id="countLabel">0 个词条</p>
+            </div>
+            <span class="pill" id="playModeLabel">顺序</span>
+          </div>
+
+          <article class="term-card" aria-live="polite">
+            <p class="term-meta" id="termMeta">未开始</p>
+            <h2 id="currentTerm">先添加单词</h2>
+            <p class="phonetic" id="currentPhonetic"></p>
+            <p class="meaning" id="currentMeaning">添加后可以一键循环听。</p>
+            <p class="sentence" id="currentSentence"></p>
+            <p class="shadow-status" id="shadowStatus" hidden>轮到你跟读</p>
+          </article>
+
+          <div class="progress-track" aria-hidden="true">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+
+          <div class="transport" aria-label="播放控制">
+            <button class="round-button" id="prevBtn" type="button" aria-label="上一个">
+              <span aria-hidden="true">‹</span>
+            </button>
+            <button class="play-button" id="playBtn" type="button" aria-label="播放">
+              <span id="playIcon" aria-hidden="true">▶</span>
+            </button>
+            <button class="round-button" id="nextBtn" type="button" aria-label="下一个">
+              <span aria-hidden="true">›</span>
+            </button>
+          </div>
+
+          <div class="quick-actions">
+            <button id="familiarBtn" type="button">标记熟悉</button>
+            <button id="repeatBtn" type="button">重复 2 次</button>
+            <button id="shuffleBtn" type="button">顺序播放</button>
+            <button id="shadowBtn" type="button">跟读关闭</button>
+          </div>
+        </section>
+
+        <nav class="tabs" aria-label="功能切换">
+          <button class="tab active" type="button" data-tab="add">添加</button>
+          <button class="tab" type="button" data-tab="library">词库</button>
+          <button class="tab" type="button" data-tab="settings">设置</button>
+        </nav>
+
+        <section class="tab-panel active" id="addPanel">
+          <form class="panel form-panel" id="singleForm">
+            <div class="quick-add-head">
+              <h2>快速添加</h2>
+              <button class="text-button" id="moreFieldsBtn" type="button" aria-expanded="false">更多</button>
+            </div>
+            <div class="quick-inputs">
+              <label>
+                <span>英文</span>
+                <input id="termInput" name="term" autocomplete="off" placeholder="可以填英文，也可以只填中文" />
+              </label>
+              <label>
+                <span>中文意思</span>
+                <input id="meaningInput" name="meaning" autocomplete="off" placeholder="可以不填，自动翻译" />
+              </label>
+            </div>
+            <div class="extra-fields" id="extraFields" hidden>
+              <label>
+                <span>音标</span>
+                <input id="phoneticInput" name="phonetic" autocomplete="off" placeholder="可不填，例如 /ˈnesəseri/" />
+              </label>
+              <label>
+                <span>例句</span>
+                <div class="sentence-tools">
+                  <textarea id="sentenceInput" name="sentence" rows="3" placeholder="可以手动输入，也可以点语音说一句。"></textarea>
+                  <button class="voice-button" id="sentenceVoiceBtn" type="button" aria-label="语音输入例句">语音</button>
+                </div>
+              </label>
+            </div>
+            <button class="primary-action" type="submit">保存词条</button>
+            <p class="form-note" id="singleStatus" role="status" aria-live="polite"></p>
+          </form>
+
+          <section class="panel form-panel bulk-panel collapsed" id="bulkPanel">
+            <div class="panel-title-row">
+              <h2>批量添加</h2>
+              <div class="compact-actions">
+                <button class="text-button" id="bulkToggleBtn" type="button" aria-expanded="false">展开</button>
+                <button class="text-button" id="sampleBtn" type="button">示例</button>
+              </div>
+            </div>
+            <div class="bulk-body" id="bulkBody" hidden>
+              <textarea id="bulkInput" rows="7" placeholder="necessary | /ˈnesəseri/ | 必要的 | It is necessary to practice every day.&#10;good&#10;commute | 通勤 | I listen to English during my commute."></textarea>
+              <div class="split-actions">
+                <button class="primary-action" id="bulkAddBtn" type="button">加入词库</button>
+                <label class="file-button">
+                  <input id="fileInput" type="file" accept=".txt,.csv,.json" />
+                  导入文件
+                </label>
+              </div>
+            </div>
+            <p class="form-note" id="bulkStatus" role="status" aria-live="polite"></p>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="libraryPanel" hidden>
+          <section class="panel library-tools">
+            <label>
+              <span>搜索</span>
+              <input id="searchInput" autocomplete="off" placeholder="输入英文或中文" />
+            </label>
+            <div class="split-actions">
+              <button id="exportBtn" type="button">导出</button>
+              <button id="clearDoneBtn" type="button">隐藏熟悉</button>
+              <button class="danger" id="clearAllBtn" type="button">清空</button>
+            </div>
+          </section>
+          <section class="word-list" id="wordList" aria-label="词库"></section>
+        </section>
+
+        <section class="tab-panel" id="settingsPanel" hidden>
+          <section class="panel settings-panel">
+            <label>
+              <span>语音</span>
+              <select id="voiceSelect"></select>
+            </label>
+            <label>
+              <span>速度 <strong id="rateValue">0.9x</strong></span>
+              <input id="rateInput" type="range" min="0.6" max="1.2" step="0.05" value="0.9" />
+            </label>
+            <label>
+              <span>间隔 <strong id="gapValue">1.0 秒</strong></span>
+              <input id="gapInput" type="range" min="0.2" max="2.5" step="0.1" value="1" />
+            </label>
+            <label>
+              <span>跟读等待 <strong id="shadowGapValue">4.0 秒</strong></span>
+              <input id="shadowGapInput" type="range" min="2" max="10" step="0.5" value="4" />
+            </label>
+            <div class="toggle-row">
+              <span>跟读模式</span>
+              <label class="switch">
+                <input id="shadowToggle" type="checkbox" />
+                <span></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span>朗读中文释义</span>
+              <label class="switch">
+                <input id="meaningToggle" type="checkbox" />
+                <span></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span>朗读例句</span>
+              <label class="switch">
+                <input id="sentenceToggle" type="checkbox" checked />
+                <span></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span>跳过熟悉词</span>
+              <label class="switch">
+                <input id="skipKnownToggle" type="checkbox" />
+                <span></span>
+              </label>
+            </div>
+            <div class="storage-box" id="storageBox">
+              <div>
+                <h2>保存状态</h2>
+                <p id="storageStatus">正在检查保存状态。</p>
+              </div>
+              <button id="protectStorageBtn" type="button">保护数据</button>
+            </div>
+          </section>
+        </section>
+      </main>
+      <p class="app-status" id="appStatus" role="status" aria-live="polite"></p>
+    </div>
+
+    <dialog class="help-dialog" id="installDialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h2>手机上这样用</h2>
+          <button class="mini-button" type="submit" aria-label="关闭">×</button>
+        </div>
+        <p id="phoneUrlText">电脑和手机连同一个 Wi-Fi 后，用手机浏览器打开本页显示的地址。</p>
+        <ol>
+          <li>先在电脑上保持这个小工具打开。</li>
+          <li>手机浏览器打开上面的地址。</li>
+          <li>需要放到桌面时，用浏览器分享按钮里的“添加到主屏幕”。</li>
+        </ol>
+        <p class="dialog-note">直接用 file 文件打开时不能真正安装到手机，只适合在电脑上试用。</p>
+      </form>
+    </dialog>
+
+    <template id="wordItemTemplate">
+      <article class="word-item">
+        <button class="word-main" type="button"></button>
+        <div class="word-actions">
+          <button class="mini-button speak" type="button" aria-label="朗读">▶</button>
+          <button class="mini-button known" type="button">熟悉</button>
+          <button class="mini-button delete" type="button">删除</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
