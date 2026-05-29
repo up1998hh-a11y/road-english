@@ -185,6 +185,19 @@ h2 {
   content: "已熟悉";
 }
 
+.term-card.hard-current {
+  border-color: rgba(233, 104, 74, 0.46);
+  background:
+    linear-gradient(180deg, rgba(255, 248, 242, 0.97), rgba(255, 253, 247, 0.97)),
+    var(--surface);
+}
+
+.term-card.hard-current .term-meta::after {
+  margin-left: 8px;
+  color: #a9361f;
+  content: "难词";
+}
+
 #currentTerm {
   align-self: end;
   overflow-wrap: anywhere;
@@ -295,6 +308,12 @@ h2 {
   border-color: rgba(13, 118, 110, 0.35);
   background: var(--accent-soft);
   color: var(--accent-strong);
+}
+
+.quick-actions button.active-hard {
+  border-color: rgba(233, 104, 74, 0.32);
+  background: #fff0e9;
+  color: #a9361f;
 }
 
 .tabs {
@@ -528,6 +547,11 @@ select:focus {
   background: rgba(223, 243, 239, 0.55);
 }
 
+.word-item.hard-item {
+  border-color: rgba(233, 104, 74, 0.32);
+  background: rgba(255, 240, 233, 0.62);
+}
+
 .word-main {
   display: grid;
   gap: 5px;
@@ -557,7 +581,7 @@ select:focus {
 
 .word-actions {
   display: grid;
-  grid-template-columns: 52px 1fr 1fr;
+  grid-template-columns: 52px 1fr 1fr 1fr;
   gap: 8px;
 }
 
@@ -571,6 +595,12 @@ select:focus {
   border-color: rgba(13, 118, 110, 0.2);
   background: var(--accent-soft);
   color: var(--accent-strong);
+}
+
+.mini-button.hard.active {
+  border-color: rgba(233, 104, 74, 0.28);
+  background: #fff0e9;
+  color: #a9361f;
 }
 
 .danger,

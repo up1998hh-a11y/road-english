@@ -31,6 +31,7 @@ export function normalizeWords(words) {
       phonetic: String(word.phonetic || "").trim().slice(0, 120),
       sentence: String(word.sentence || "").trim().slice(0, 800),
       known: Boolean(word.known),
+      hard: Boolean(word.hard),
       createdAt: String(word.createdAt || new Date().toISOString()).slice(0, 80),
       listenCount: Number(word.listenCount || 0),
     }))

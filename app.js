@@ -140,6 +140,7 @@ const defaultSettings = {
   speakMeaning: false,
   speakSentence: true,
   skipKnown: false,
+  hardOnly: false,
   voiceName: "",
   hideKnown: false,
 };
@@ -191,7 +192,9 @@ const els = {
   playIcon: $("#playIcon"),
   nextBtn: $("#nextBtn"),
   familiarBtn: $("#familiarBtn"),
+  hardBtn: $("#hardBtn"),
   repeatBtn: $("#repeatBtn"),
+  hardModeBtn: $("#hardModeBtn"),
   shuffleBtn: $("#shuffleBtn"),
   shadowBtn: $("#shadowBtn"),
   tabs: document.querySelectorAll(".tab"),
@@ -458,6 +461,7 @@ function createWord({ term, meaning = "", phonetic = "", sentence = "" }) {
     phonetic: String(phonetic || "").trim(),
     sentence: String(sentence || "").trim(),
     known: false,
+    hard: false,
     createdAt: new Date().toISOString(),
     listenCount: 0,
   };
@@ -467,16 +471,23 @@ function normalizeWord(raw) {
   if (!raw || typeof raw !== "object") return null;
   const term = String(raw.term || raw.word || raw.english || "").trim();
   if (!term) return null;
-  return createWord({
+  const word = createWord({
     term,
     meaning: String(raw.meaning || raw.chinese || raw.translation || "").trim(),
     phonetic: String(raw.phonetic || raw.ipa || raw.pronunciation || "").trim(),
     sentence: String(raw.sentence || raw.example || "").trim(),
   });
+  word.known = Boolean(raw.known);
+  word.hard = Boolean(raw.hard);
+  return word;
 }
 
 function getPlayableWords() {
-  const list = state.settings.skipKnown ? state.words.filter((word) => !word.known) : state.words;
+  const list = state.words.filter((word) => {
+    if (state.settings.hardOnly && !word.hard) return false;
+    if (state.settings.skipKnown && word.known) return false;
+    return true;
+  });
   return list;
 }
 
@@ -492,13 +503,17 @@ function updateScreen() {
   const word = getCurrentWord();
   const total = state.words.length;
   const known = state.words.filter((item) => item.known).length;
+  const hard = state.words.filter((item) => item.hard).length;
 
-  els.countLabel.textContent = `${total} 个词条${known ? `，${known} 个熟悉` : ""}`;
-  els.playModeLabel.textContent = state.settings.shuffle ? "随机" : "顺序";
+  els.countLabel.textContent = `${total} 个词条${known ? `，${known} 个熟悉` : ""}${hard ? `，${hard} 个难词` : ""}`;
+  els.playModeLabel.textContent = state.settings.hardOnly ? "难词" : state.settings.shuffle ? "随机" : "顺序";
   els.repeatBtn.textContent = `重复 ${state.settings.repeat} 次`;
+  els.hardModeBtn.textContent = state.settings.hardOnly ? "难词循环" : "全部循环";
   els.shuffleBtn.textContent = state.settings.shuffle ? "随机播放" : "顺序播放";
   els.shadowBtn.textContent = state.settings.shadowing ? "跟读开启" : "跟读关闭";
   els.familiarBtn.disabled = !word;
+  els.hardBtn.disabled = !word;
+  els.hardModeBtn.disabled = !hard && !state.settings.hardOnly;
   els.prevBtn.disabled = !word;
   els.nextBtn.disabled = !word;
   els.playBtn.disabled = !word;
@@ -506,13 +521,20 @@ function updateScreen() {
   els.playBtn.setAttribute("aria-label", state.playing ? "暂停" : "播放");
   els.shadowStatus.hidden = !state.shadowingNow;
   document.querySelector(".term-card").classList.toggle("known-current", Boolean(word?.known));
+  document.querySelector(".term-card").classList.toggle("hard-current", Boolean(word?.hard));
   els.familiarBtn.classList.toggle("active-known", Boolean(word?.known));
+  els.hardBtn.classList.toggle("active-hard", Boolean(word?.hard));
+  els.hardModeBtn.classList.toggle("active-hard", Boolean(state.settings.hardOnly));
 
   if (!word) {
     els.termMeta.textContent = total ? "没有待播放词条" : "未开始";
-    els.currentTerm.textContent = total ? "都熟悉了" : "先添加单词";
+    els.currentTerm.textContent = total ? (state.settings.hardOnly ? "还没有难词" : "都熟悉了") : "先添加单词";
     els.currentPhonetic.textContent = "";
-    els.currentMeaning.textContent = total ? "关闭“跳过熟悉词”可以继续复习。" : "添加后可以一键循环听。";
+    els.currentMeaning.textContent = total
+      ? state.settings.hardOnly
+        ? "把不会的词标记为难词，就可以在这里循环听。"
+        : "关闭“跳过熟悉词”可以继续复习。"
+      : "添加后可以一键循环听。";
     els.currentSentence.textContent = "";
     els.progressBar.style.width = "0%";
   } else {
@@ -533,6 +555,7 @@ function updateScreen() {
       word.meaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义");
     els.currentSentence.textContent = word.sentence || "";
     els.familiarBtn.textContent = word.known ? "取消熟悉" : "标记熟悉";
+    els.hardBtn.textContent = word.hard ? "取消难词" : "标记难词";
     els.progressBar.style.width = `${(position / playable.length) * 100}%`;
     autoTranslateWord(word);
     autoFillPhonetic(word);
@@ -574,8 +597,10 @@ function renderWordList() {
   visibleWords.forEach((word) => {
     const node = els.template.content.firstElementChild.cloneNode(true);
     node.classList.toggle("known-item", word.known);
+    node.classList.toggle("hard-item", word.hard);
     const main = node.querySelector(".word-main");
     const speak = node.querySelector(".speak");
+    const hard = node.querySelector(".hard");
     const known = node.querySelector(".known");
     const deleteBtn = node.querySelector(".delete");
 
@@ -585,6 +610,8 @@ function renderWordList() {
       <span>${escapeHtml(word.meaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义"))}</span>
       ${word.sentence ? `<small>${escapeHtml(word.sentence)}</small>` : ""}
     `;
+    hard.textContent = word.hard ? "难词中" : "难词";
+    hard.classList.toggle("active", word.hard);
     known.textContent = word.known ? "已熟悉" : "熟悉";
     known.classList.toggle("active", word.known);
 
@@ -596,6 +623,7 @@ function renderWordList() {
       speakOnce(word);
     });
     speak.addEventListener("click", () => speakOnce(word));
+    hard.addEventListener("click", () => toggleHard(word.id));
     known.addEventListener("click", () => toggleKnown(word.id));
     deleteBtn.addEventListener("click", () => removeWord(word.id));
     els.wordList.append(node);
@@ -1171,6 +1199,20 @@ function toggleKnown(id) {
   const word = state.words.find((item) => item.id === id);
   if (!word) return;
   word.known = !word.known;
+  if (word.known) {
+    word.hard = false;
+  }
+  saveWords();
+  updateScreen();
+}
+
+function toggleHard(id) {
+  const word = state.words.find((item) => item.id === id);
+  if (!word) return;
+  word.hard = !word.hard;
+  if (word.hard) {
+    word.known = false;
+  }
   saveWords();
   updateScreen();
 }
@@ -1247,8 +1289,20 @@ function bindEvents() {
     if (word) toggleKnown(word.id);
   });
 
+  els.hardBtn.addEventListener("click", () => {
+    const word = getCurrentWord();
+    if (word) toggleHard(word.id);
+  });
+
   els.repeatBtn.addEventListener("click", () => {
     state.settings.repeat = state.settings.repeat >= 5 ? 1 : state.settings.repeat + 1;
+    saveSettings();
+    updateScreen();
+  });
+
+  els.hardModeBtn.addEventListener("click", () => {
+    state.settings.hardOnly = !state.settings.hardOnly;
+    state.index = 0;
     saveSettings();
     updateScreen();
   });
