@@ -1,6 +1,7 @@
 const STORAGE_KEY = "drive-english-v1";
 const SETTINGS_KEY = "drive-english-settings-v1";
 const TRANSLATION_CACHE_KEY = "drive-english-translation-cache-v1";
+const PHONETIC_CACHE_KEY = "drive-english-phonetic-cache-v1";
 const CLOUD_SETTINGS_KEY = "drive-english-cloud-settings-v1";
 const DB_NAME = "drive-english-db";
 const DB_VERSION = 1;
@@ -114,6 +115,19 @@ const basicPhonetics = {
   meaning: "/ˈmiːnɪŋ/",
   operate: "/ˈɑːpəreɪt/",
   efficiently: "/ɪˈfɪʃəntli/",
+  efficient: "/ɪˈfɪʃnt/",
+  persistent: "/pərˈsɪstənt/",
+  backend: "/ˈbækˌend/",
+  frontend: "/ˈfrʌntˌend/",
+  upload: "/ˌʌpˈloʊd/",
+  download: "/ˌdaʊnˈloʊd/",
+  sync: "/sɪŋk/",
+  familiar: "/fəˈmɪliər/",
+  translate: "/trænzˈleɪt/",
+  phonetic: "/fəˈnetɪk/",
+  storage: "/ˈstɔːrɪdʒ/",
+  cloud: "/klaʊd/",
+  deploy: "/dɪˈplɔɪ/",
 };
 
 const defaultSettings = {
@@ -146,6 +160,7 @@ const state = {
   voices: [],
   deferredInstallPrompt: null,
   translationCache: loadTranslationCache(),
+  phoneticCache: loadPhoneticCache(),
   translatingIds: new Set(),
   shadowingNow: false,
   storageAvailable: true,
@@ -253,6 +268,14 @@ function loadSettings() {
 function loadTranslationCache() {
   try {
     return JSON.parse(window.localStorage.getItem(TRANSLATION_CACHE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function loadPhoneticCache() {
+  try {
+    return JSON.parse(window.localStorage.getItem(PHONETIC_CACHE_KEY) || "{}");
   } catch {
     return {};
   }
@@ -380,6 +403,18 @@ function saveTranslationCache() {
   }
 }
 
+function savePhoneticCache() {
+  if (state.db) {
+    saveMetaToDatabase("phoneticCache", state.phoneticCache);
+  }
+  try {
+    window.localStorage.setItem(PHONETIC_CACHE_KEY, JSON.stringify(state.phoneticCache));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function saveCloudSettings() {
   try {
     window.localStorage.setItem(CLOUD_SETTINGS_KEY, JSON.stringify(state.cloud));
@@ -482,9 +517,18 @@ function updateScreen() {
     els.progressBar.style.width = "0%";
   } else {
     const position = playable.findIndex((item) => item.id === word.id) + 1;
+    const phoneticKey = word.term.trim().toLowerCase();
+    const phoneticLookupId = `phonetic-${word.id}`;
+    const phoneticText =
+      word.phonetic ||
+      (state.translatingIds.has(phoneticLookupId)
+        ? "正在查音标…"
+        : state.phoneticCache[phoneticKey]?.triedAt
+          ? "暂无音标"
+          : "等待查音标");
     els.termMeta.textContent = `${position} / ${playable.length}`;
     els.currentTerm.textContent = word.term;
-    els.currentPhonetic.textContent = word.phonetic || "正在查音标…";
+    els.currentPhonetic.textContent = phoneticText;
     els.currentMeaning.textContent =
       word.meaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义");
     els.currentSentence.textContent = word.sentence || "";
@@ -643,20 +687,48 @@ async function translateChineseToEnglish(meaning) {
     .trim();
 }
 
+function fetchWithTimeout(url, timeout = 3000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { signal: controller.signal }).finally(() => window.clearTimeout(timer));
+}
+
+function shouldRetryPhonetic(cacheItem) {
+  if (!cacheItem || typeof cacheItem !== "object") return true;
+  if (cacheItem.value) return true;
+  const lastTried = Date.parse(cacheItem.triedAt || "");
+  if (!lastTried) return true;
+  return Date.now() - lastTried > 24 * 60 * 60 * 1000;
+}
+
 async function autoFillPhonetic(word) {
   if (!word || word.phonetic || state.translatingIds.has(`phonetic-${word.id}`)) return;
   const term = word.term.trim();
   const cacheKey = term.toLowerCase();
   if (basicPhonetics[cacheKey]) {
     word.phonetic = basicPhonetics[cacheKey];
+    state.phoneticCache[cacheKey] = { value: word.phonetic, triedAt: new Date().toISOString() };
+    savePhoneticCache();
     saveWords();
     updateScreen();
     return;
   }
 
+  const cached = state.phoneticCache[cacheKey];
+  if (cached?.value) {
+    word.phonetic = cached.value;
+    saveWords();
+    updateScreen();
+    return;
+  }
+  if (!shouldRetryPhonetic(cached)) return;
+
   state.translatingIds.add(`phonetic-${word.id}`);
   try {
-    const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(term)}`);
+    const response = await fetchWithTimeout(
+      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(term)}`,
+      3000
+    );
     if (!response.ok) throw new Error("Phonetic request failed");
     const data = await response.json();
     const entry = Array.isArray(data) ? data[0] : null;
@@ -666,10 +738,16 @@ async function autoFillPhonetic(word) {
       "";
     if (phonetic) {
       word.phonetic = phonetic;
+      state.phoneticCache[cacheKey] = { value: phonetic, triedAt: new Date().toISOString() };
+      savePhoneticCache();
       saveWords();
+    } else {
+      state.phoneticCache[cacheKey] = { value: "", triedAt: new Date().toISOString() };
+      savePhoneticCache();
     }
   } catch {
-    // A missing network phonetic should not block saving or playback.
+    state.phoneticCache[cacheKey] = { value: "", triedAt: new Date().toISOString() };
+    savePhoneticCache();
   } finally {
     state.translatingIds.delete(`phonetic-${word.id}`);
     updateScreen();
