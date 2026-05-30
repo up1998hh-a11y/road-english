@@ -1,4 +1,4 @@
-const CACHE_NAME = "drive-english-cache-v32";
+const CACHE_NAME = "drive-english-cache-v33";
 const APP_FILES = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
