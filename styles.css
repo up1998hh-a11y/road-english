@@ -726,41 +726,27 @@ input[type="range"] {
   font-weight: 750;
 }
 
-.storage-box,
-.cloud-box {
+.storage-box {
   display: grid;
   gap: 12px;
   padding-top: 14px;
   border-top: 1px solid rgba(32, 36, 42, 0.08);
 }
 
-.storage-box p,
-.cloud-box p {
+.storage-box p {
   margin: 6px 0 0;
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.45;
 }
 
-.storage-box button,
-.cloud-box button {
+.storage-box button {
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-strong);
   color: var(--text);
   font-weight: 800;
-}
-
-.sync-code-row {
-  display: grid;
-  grid-template-columns: 1fr 76px;
-  gap: 8px;
-}
-
-.cloud-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
 }
 
 .switch {
