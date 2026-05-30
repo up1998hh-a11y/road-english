@@ -161,6 +161,7 @@ const defaultSettings = {
   shadowing: false,
   shadowGap: 4000,
   shuffle: false,
+  loopCurrent: false,
   speakMeaning: false,
   speakSentence: true,
   skipKnown: false,
@@ -578,10 +579,18 @@ function updateScreen() {
   const hard = state.words.filter((item) => item.hard).length;
 
   els.countLabel.textContent = `${total} 个词条${known ? `，${known} 个熟悉` : ""}${hard ? `，${hard} 个难词` : ""}`;
-  els.playModeLabel.textContent = state.settings.hardOnly ? "难词" : "当前词";
+  els.playModeLabel.textContent = state.settings.loopCurrent
+    ? "单词循环"
+    : state.settings.shuffle
+      ? state.settings.hardOnly
+        ? "难词随机"
+        : "随机列表"
+      : state.settings.hardOnly
+        ? "难词顺序"
+        : "顺序列表";
   els.repeatBtn.textContent = `重复 ${state.settings.repeat} 次`;
   els.hardModeBtn.textContent = state.settings.hardOnly ? "只听难词" : "全部词库";
-  els.shuffleBtn.textContent = state.settings.shuffle ? "下个随机" : "下个顺序";
+  els.shuffleBtn.textContent = state.settings.loopCurrent ? "单词循环" : state.settings.shuffle ? "随机列表" : "顺序列表";
   els.shadowBtn.textContent = state.settings.shadowing ? "跟读开启" : "跟读关闭";
   els.familiarBtn.disabled = !word;
   els.hardBtn.disabled = !word;
@@ -1366,6 +1375,9 @@ async function playLoop() {
   while (state.playing && getCurrentWord() && token === state.playbackToken) {
     await speakWord(getCurrentWord(), token);
     if (state.playing && token === state.playbackToken) await wait(state.settings.gap);
+    if (!state.settings.loopCurrent && state.playing && token === state.playbackToken) {
+      setNextIndex(1);
+    }
   }
 
   if (token === state.playbackToken) stopPlayback();
@@ -1537,7 +1549,15 @@ function bindEvents() {
   });
 
   els.shuffleBtn.addEventListener("click", () => {
-    state.settings.shuffle = !state.settings.shuffle;
+    if (!state.settings.shuffle && !state.settings.loopCurrent) {
+      state.settings.shuffle = true;
+    } else if (state.settings.shuffle && !state.settings.loopCurrent) {
+      state.settings.shuffle = false;
+      state.settings.loopCurrent = true;
+    } else {
+      state.settings.shuffle = false;
+      state.settings.loopCurrent = false;
+    }
     saveSettings();
     updateScreen();
   });
