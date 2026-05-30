@@ -531,17 +531,44 @@ function getCurrentWord() {
 function cleanMeaningText(value) {
   const text = String(value || "").trim();
   if (!text) return "";
-  return text
-    .replace(/\s+/g, " ")
+  const normalized = text.replace(/\s+/g, " ");
+  const primary = normalized
     .split(/[;；|/、，,\n]/)
     .map((item) => item.trim())
-    .find((item) => item && !/^[-–—]$/.test(item)) || text;
+    .find((item) => item && !/^[-–—]$/.test(item));
+  if (primary && primary !== normalized) return primary;
+  if (hasChineseText(normalized)) {
+    return normalized.split(/\s+/).find(Boolean) || normalized;
+  }
+  return primary || normalized;
 }
 
 function getPhoneticLookupTerm(value) {
   const text = String(value || "").trim();
   const match = text.match(/[A-Za-z]+(?:['-][A-Za-z]+)?/);
   return match ? match[0] : text;
+}
+
+function getTermParts(value) {
+  const text = String(value || "").trim();
+  const match = text.match(/[A-Za-z][A-Za-z'’-]*(?:[-\s][A-Za-z][A-Za-z'’-]*)*/);
+  const english = match ? match[0].replace(/\s+/g, " ").trim() : "";
+  const meaning = english ? text.replace(english, " ").trim() : "";
+  return { english, meaning };
+}
+
+function getDisplayTerm(word) {
+  const term = String(word?.term || "").trim();
+  return getTermParts(term).english || term;
+}
+
+function getEmbeddedMeaning(word) {
+  const meaning = getTermParts(word?.term).meaning;
+  return hasChineseText(meaning) ? cleanMeaningText(meaning) : "";
+}
+
+function getDisplayMeaning(word) {
+  return cleanMeaningText(word?.meaning) || getEmbeddedMeaning(word);
 }
 
 function updateScreen() {
@@ -566,8 +593,10 @@ function updateScreen() {
   els.playIcon.textContent = state.playing ? "Ⅱ" : "▶";
   els.playBtn.setAttribute("aria-label", state.playing ? "暂停" : "播放");
   els.shadowStatus.hidden = !state.shadowingNow;
-  document.querySelector(".term-card").classList.toggle("known-current", Boolean(word?.known));
-  document.querySelector(".term-card").classList.toggle("hard-current", Boolean(word?.hard));
+  const termCard = document.querySelector(".term-card");
+  termCard.classList.toggle("known-current", Boolean(word?.known));
+  termCard.classList.toggle("hard-current", Boolean(word?.hard));
+  termCard.classList.toggle("long-term", Boolean(word && getDisplayTerm(word).length > 10));
   els.familiarBtn.classList.toggle("active-known", Boolean(word?.known));
   els.hardBtn.classList.toggle("active-hard", Boolean(word?.hard));
   els.hardModeBtn.classList.toggle("active-hard", Boolean(state.settings.hardOnly));
@@ -585,7 +614,9 @@ function updateScreen() {
     els.progressBar.style.width = "0%";
   } else {
     const position = playable.findIndex((item) => item.id === word.id) + 1;
-    const phoneticKey = getPhoneticLookupTerm(word.term).toLowerCase();
+    const displayTerm = getDisplayTerm(word);
+    const displayMeaning = getDisplayMeaning(word);
+    const phoneticKey = getPhoneticLookupTerm(displayTerm).toLowerCase();
     const phoneticLookupId = `phonetic-${word.id}`;
     const phoneticText =
       word.phonetic ||
@@ -595,10 +626,10 @@ function updateScreen() {
           ? "暂无音标"
           : "等待查音标");
     els.termMeta.textContent = `${position} / ${playable.length}`;
-    els.currentTerm.textContent = word.term;
+    els.currentTerm.textContent = displayTerm;
     els.currentPhonetic.textContent = phoneticText;
     els.currentMeaning.textContent =
-      cleanMeaningText(word.meaning) || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义");
+      displayMeaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义");
     els.currentSentence.textContent = word.sentence || "";
     els.familiarBtn.textContent = word.known ? "取消熟悉" : "标记熟悉";
     els.hardBtn.textContent = word.hard ? "取消难词" : "标记难词";
@@ -652,11 +683,13 @@ function renderWordList() {
     const hard = node.querySelector(".hard");
     const known = node.querySelector(".known");
     const deleteBtn = node.querySelector(".delete");
+    const displayTerm = getDisplayTerm(word);
+    const displayMeaning = getDisplayMeaning(word);
 
     main.innerHTML = `
-      <strong>${escapeHtml(word.term)}</strong>
+      <strong>${escapeHtml(displayTerm)}</strong>
       ${word.phonetic ? `<em>${escapeHtml(word.phonetic)}</em>` : ""}
-      <span>${escapeHtml(cleanMeaningText(word.meaning) || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义"))}</span>
+      <span>${escapeHtml(displayMeaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义"))}</span>
       ${word.sentence ? `<small>${escapeHtml(word.sentence)}</small>` : ""}
     `;
     hard.textContent = word.hard ? "难词中" : "难词";
@@ -690,8 +723,8 @@ function escapeHtml(value) {
 }
 
 async function autoTranslateWord(word) {
-  if (!word || word.meaning || state.translatingIds.has(word.id)) return;
-  const term = word.term.trim();
+  if (!word || word.meaning || getEmbeddedMeaning(word) || state.translatingIds.has(word.id)) return;
+  const term = getDisplayTerm(word);
   const cacheKey = term.toLowerCase();
   if (basicTranslations[cacheKey]) {
     word.meaning = cleanMeaningText(basicTranslations[cacheKey]);
@@ -785,7 +818,7 @@ function shouldRetryPhonetic(cacheItem) {
 
 async function autoFillPhonetic(word) {
   if (!word || word.phonetic || state.translatingIds.has(`phonetic-${word.id}`)) return;
-  const term = getPhoneticLookupTerm(word.term);
+  const term = getPhoneticLookupTerm(getDisplayTerm(word));
   if (!term) return;
   const cacheKey = term.toLowerCase();
   if (basicPhonetics[cacheKey]) {
@@ -1281,9 +1314,10 @@ async function speakWord(word, token = state.playbackToken) {
   state.activeSpeechToken = token;
 
   try {
+    const spokenTerm = getDisplayTerm(word);
     const repeatCount = Number(state.settings.repeat);
     for (let i = 0; i < repeatCount && state.playing && token === state.playbackToken; i += 1) {
-      await speakText(word.term, "en-US", token);
+      await speakText(spokenTerm, "en-US", token);
       if (token === state.playbackToken) await wait(state.settings.gap);
     }
 
@@ -1296,8 +1330,9 @@ async function speakWord(word, token = state.playbackToken) {
       updateScreen();
     }
 
-    if (state.settings.speakMeaning && word.meaning && state.playing && token === state.playbackToken) {
-      await speakText(cleanMeaningText(word.meaning), "zh-CN", token);
+    const spokenMeaning = getDisplayMeaning(word);
+    if (state.settings.speakMeaning && spokenMeaning && state.playing && token === state.playbackToken) {
+      await speakText(spokenMeaning, "zh-CN", token);
       if (token === state.playbackToken) await wait(state.settings.gap);
     }
 
