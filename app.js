@@ -130,6 +130,30 @@ const basicPhonetics = {
   deploy: "/dɪˈplɔɪ/",
 };
 
+const britishStyleVoiceLangs = ["en-gb", "en-ie", "en-au", "en-nz", "en-za"];
+const preferredEnglishVoiceLangs = [...britishStyleVoiceLangs, "en-ca", "en-us"];
+const highQualityVoicePatterns = [/enhanced/i, /premium/i, /neural/i, /natural/i, /siri/i, /优化音质/i, /精品/i];
+const roboticVoicePatterns = [
+  /compact/i,
+  /eloquence/i,
+  /novelty/i,
+  /robot/i,
+  /zarvox/i,
+  /trinoids/i,
+  /whisper/i,
+  /boing/i,
+  /bubbles/i,
+  /cellos/i,
+  /bells/i,
+  /organ/i,
+  /jester/i,
+  /superstar/i,
+  /bad news/i,
+  /good news/i,
+  /fred/i,
+  /albert/i,
+];
+
 const defaultSettings = {
   rate: 0.9,
   gap: 1000,
@@ -158,6 +182,8 @@ const state = {
   index: 0,
   playing: false,
   speaking: false,
+  playbackMode: "",
+  activeSpeechToken: 0,
   voices: [],
   deferredInstallPrompt: null,
   translationCache: loadTranslationCache(),
@@ -169,6 +195,10 @@ const state = {
   durableStorage: false,
   syncTimer: null,
   syncing: false,
+  playbackToken: 0,
+  lastInterruptAt: 0,
+  waiters: new Set(),
+  wordListDirty: true,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -498,6 +528,22 @@ function getCurrentWord() {
   return list[state.index];
 }
 
+function cleanMeaningText(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text
+    .replace(/\s+/g, " ")
+    .split(/[;；|/、，,\n]/)
+    .map((item) => item.trim())
+    .find((item) => item && !/^[-–—]$/.test(item)) || text;
+}
+
+function getPhoneticLookupTerm(value) {
+  const text = String(value || "").trim();
+  const match = text.match(/[A-Za-z]+(?:['-][A-Za-z]+)?/);
+  return match ? match[0] : text;
+}
+
 function updateScreen() {
   const playable = getPlayableWords();
   const word = getCurrentWord();
@@ -506,10 +552,10 @@ function updateScreen() {
   const hard = state.words.filter((item) => item.hard).length;
 
   els.countLabel.textContent = `${total} 个词条${known ? `，${known} 个熟悉` : ""}${hard ? `，${hard} 个难词` : ""}`;
-  els.playModeLabel.textContent = state.settings.hardOnly ? "难词" : state.settings.shuffle ? "随机" : "顺序";
+  els.playModeLabel.textContent = state.settings.hardOnly ? "难词" : "当前词";
   els.repeatBtn.textContent = `重复 ${state.settings.repeat} 次`;
-  els.hardModeBtn.textContent = state.settings.hardOnly ? "难词循环" : "全部循环";
-  els.shuffleBtn.textContent = state.settings.shuffle ? "随机播放" : "顺序播放";
+  els.hardModeBtn.textContent = state.settings.hardOnly ? "只听难词" : "全部词库";
+  els.shuffleBtn.textContent = state.settings.shuffle ? "下个随机" : "下个顺序";
   els.shadowBtn.textContent = state.settings.shadowing ? "跟读开启" : "跟读关闭";
   els.familiarBtn.disabled = !word;
   els.hardBtn.disabled = !word;
@@ -539,7 +585,7 @@ function updateScreen() {
     els.progressBar.style.width = "0%";
   } else {
     const position = playable.findIndex((item) => item.id === word.id) + 1;
-    const phoneticKey = word.term.trim().toLowerCase();
+    const phoneticKey = getPhoneticLookupTerm(word.term).toLowerCase();
     const phoneticLookupId = `phonetic-${word.id}`;
     const phoneticText =
       word.phonetic ||
@@ -552,7 +598,7 @@ function updateScreen() {
     els.currentTerm.textContent = word.term;
     els.currentPhonetic.textContent = phoneticText;
     els.currentMeaning.textContent =
-      word.meaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义");
+      cleanMeaningText(word.meaning) || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义");
     els.currentSentence.textContent = word.sentence || "";
     els.familiarBtn.textContent = word.known ? "取消熟悉" : "标记熟悉";
     els.hardBtn.textContent = word.hard ? "取消难词" : "标记难词";
@@ -573,10 +619,13 @@ function updateScreen() {
   els.shadowToggle.checked = state.settings.shadowing;
   els.clearDoneBtn.textContent = state.settings.hideKnown ? "显示熟悉" : "隐藏熟悉";
 
-  renderWordList();
+  if (state.wordListDirty) {
+    renderWordList();
+  }
 }
 
 function renderWordList() {
+  state.wordListDirty = false;
   const query = els.searchInput.value.trim().toLowerCase();
   const visibleWords = state.words.filter((word) => {
     if (state.settings.hideKnown && word.known) return false;
@@ -607,7 +656,7 @@ function renderWordList() {
     main.innerHTML = `
       <strong>${escapeHtml(word.term)}</strong>
       ${word.phonetic ? `<em>${escapeHtml(word.phonetic)}</em>` : ""}
-      <span>${escapeHtml(word.meaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义"))}</span>
+      <span>${escapeHtml(cleanMeaningText(word.meaning) || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义"))}</span>
       ${word.sentence ? `<small>${escapeHtml(word.sentence)}</small>` : ""}
     `;
     hard.textContent = word.hard ? "难词中" : "难词";
@@ -616,13 +665,14 @@ function renderWordList() {
     known.classList.toggle("active", word.known);
 
     main.addEventListener("click", () => {
-      const playableIndex = getPlayableWords().findIndex((item) => item.id === word.id);
-      state.index = Math.max(0, playableIndex);
-      updateScreen();
+      setCurrentWordById(word.id);
       switchTab("add");
-      speakOnce(word);
+      speakOnce(word, { interrupt: true });
     });
-    speak.addEventListener("click", () => speakOnce(word));
+    speak.addEventListener("click", () => {
+      setCurrentWordById(word.id);
+      speakOnce(word, { interrupt: true });
+    });
     hard.addEventListener("click", () => toggleHard(word.id));
     known.addEventListener("click", () => toggleKnown(word.id));
     deleteBtn.addEventListener("click", () => removeWord(word.id));
@@ -644,14 +694,16 @@ async function autoTranslateWord(word) {
   const term = word.term.trim();
   const cacheKey = term.toLowerCase();
   if (basicTranslations[cacheKey]) {
-    word.meaning = basicTranslations[cacheKey];
+    word.meaning = cleanMeaningText(basicTranslations[cacheKey]);
+    state.wordListDirty = true;
     saveWords();
     updateScreen();
     return;
   }
 
   if (state.translationCache[cacheKey]) {
-    word.meaning = state.translationCache[cacheKey];
+    word.meaning = cleanMeaningText(state.translationCache[cacheKey]);
+    state.wordListDirty = true;
     saveWords();
     updateScreen();
     return;
@@ -666,9 +718,11 @@ async function autoTranslateWord(word) {
     if (!response.ok) throw new Error("Translation request failed");
     const data = await response.json();
     const translated = String(data?.responseData?.translatedText || "").trim();
-    if (translated && translated.toLowerCase() !== term.toLowerCase()) {
-      word.meaning = translated;
-      state.translationCache[cacheKey] = translated;
+    const cleanTranslated = cleanMeaningText(translated);
+    if (cleanTranslated && cleanTranslated.toLowerCase() !== term.toLowerCase()) {
+      word.meaning = cleanTranslated;
+      state.translationCache[cacheKey] = cleanTranslated;
+      state.wordListDirty = true;
       saveTranslationCache();
       saveWords();
     }
@@ -726,16 +780,18 @@ function shouldRetryPhonetic(cacheItem) {
   if (cacheItem.value) return true;
   const lastTried = Date.parse(cacheItem.triedAt || "");
   if (!lastTried) return true;
-  return Date.now() - lastTried > 24 * 60 * 60 * 1000;
+  return Date.now() - lastTried > 10 * 60 * 1000;
 }
 
 async function autoFillPhonetic(word) {
   if (!word || word.phonetic || state.translatingIds.has(`phonetic-${word.id}`)) return;
-  const term = word.term.trim();
+  const term = getPhoneticLookupTerm(word.term);
+  if (!term) return;
   const cacheKey = term.toLowerCase();
   if (basicPhonetics[cacheKey]) {
     word.phonetic = basicPhonetics[cacheKey];
     state.phoneticCache[cacheKey] = { value: word.phonetic, triedAt: new Date().toISOString() };
+    state.wordListDirty = true;
     savePhoneticCache();
     saveWords();
     updateScreen();
@@ -745,6 +801,7 @@ async function autoFillPhonetic(word) {
   const cached = state.phoneticCache[cacheKey];
   if (cached?.value) {
     word.phonetic = cached.value;
+    state.wordListDirty = true;
     saveWords();
     updateScreen();
     return;
@@ -760,13 +817,16 @@ async function autoFillPhonetic(word) {
     if (!response.ok) throw new Error("Phonetic request failed");
     const data = await response.json();
     const entry = Array.isArray(data) ? data[0] : null;
-    const phonetic =
-      entry?.phonetics?.find((item) => item.text && item.text.includes("/"))?.text ||
-      entry?.phonetic ||
-      "";
+    const phoneticText = entry?.phonetics?.find((item) => item.text)?.text || entry?.phonetic || "";
+    const phonetic = phoneticText
+      ? phoneticText.startsWith("/") || phoneticText.startsWith("[")
+        ? phoneticText
+        : `/${phoneticText}/`
+      : "";
     if (phonetic) {
       word.phonetic = phonetic;
       state.phoneticCache[cacheKey] = { value: phonetic, triedAt: new Date().toISOString() };
+      state.wordListDirty = true;
       savePhoneticCache();
       saveWords();
     } else {
@@ -794,6 +854,7 @@ function addWords(words) {
   const existing = new Set(state.words.map((word) => word.term.toLowerCase()));
   const fresh = validWords.filter((word) => word.term && !existing.has(word.term.toLowerCase()));
   state.words.push(...fresh);
+  state.wordListDirty = true;
   const saved = saveWords();
   if (!getCurrentWord()) state.index = 0;
   updateScreen();
@@ -1070,6 +1131,14 @@ async function protectStorage() {
     : "浏览器暂时没有允许保护。继续使用没问题，但建议定期导出备份。";
 }
 
+function setCurrentWordById(id) {
+  const playableIndex = getPlayableWords().findIndex((item) => item.id === id);
+  if (playableIndex >= 0) {
+    state.index = playableIndex;
+    updateScreen();
+  }
+}
+
 function setNextIndex(direction = 1) {
   const playable = getPlayableWords();
   if (!playable.length) return;
@@ -1086,76 +1155,165 @@ function setNextIndex(direction = 1) {
 }
 
 function wait(ms) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    let timer;
+    const resolveWait = () => {
+      window.clearTimeout(timer);
+      state.waiters.delete(resolveWait);
+      resolve();
+    };
+    timer = window.setTimeout(resolveWait, ms);
+    state.waiters.add(resolveWait);
+  });
+}
+
+function interruptSpeech() {
+  state.playbackToken += 1;
+  state.speaking = false;
+  state.activeSpeechToken = 0;
+  state.shadowingNow = false;
+  state.lastInterruptAt = performance.now();
+  state.waiters.forEach((resolve) => resolve());
+  state.waiters.clear();
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+  }
+}
+
+async function settleSpeechEngine(token) {
+  const elapsed = performance.now() - state.lastInterruptAt;
+  const delay = Math.max(0, 90 - elapsed);
+  if (delay) await wait(delay);
+  return token === state.playbackToken;
+}
+
+function getVoiceLangRank(voice) {
+  const lang = voice.lang.toLowerCase();
+  const rank = preferredEnglishVoiceLangs.findIndex((prefix) => lang.startsWith(prefix));
+  return rank === -1 ? preferredEnglishVoiceLangs.length : rank;
+}
+
+function isNaturalEnglishVoice(voice) {
+  const name = voice.name.toLowerCase();
+  const lang = voice.lang.toLowerCase();
+  if (!lang.startsWith("en")) return false;
+  if (roboticVoicePatterns.some((pattern) => pattern.test(name))) return false;
+  return true;
+}
+
+function hasBritishStyleAccent(voice) {
+  const lang = voice.lang.toLowerCase();
+  return britishStyleVoiceLangs.some((prefix) => lang.startsWith(prefix)) || lang.includes("gbsct") || lang.includes("gbwls");
+}
+
+function getVoiceQualityRank(voice) {
+  const name = voice.name;
+  if (highQualityVoicePatterns.some((pattern) => pattern.test(name))) return 0;
+  if (voice.localService) return 1;
+  return 2;
+}
+
+function describeVoice(voice) {
+  const lang = voice.lang.toLowerCase();
+  const region =
+    lang.startsWith("en-gb") || lang.includes("gbsct") || lang.includes("gbwls")
+      ? "英式"
+      : lang.startsWith("en-ie")
+        ? "爱尔兰"
+        : lang.startsWith("en-au")
+          ? "澳洲"
+          : lang.startsWith("en-nz")
+            ? "新西兰"
+            : lang.startsWith("en-za")
+              ? "南非"
+              : lang.startsWith("en-ca")
+                ? "加拿大"
+                : lang.startsWith("en-us")
+                  ? "美式"
+                  : "英文";
+  const quality = highQualityVoicePatterns.some((pattern) => pattern.test(voice.name)) ? "自然音质" : "系统语音";
+  return `${voice.name} · ${region} · ${quality}`;
 }
 
 function getVoice(langPrefix = "en") {
   const selected = state.voices.find((voice) => voice.name === state.settings.voiceName);
   if (selected) return selected;
   return (
-    state.voices.find((voice) => voice.lang.toLowerCase().startsWith(`${langPrefix}-`)) ||
+    state.voices.find((voice) => voice.lang.toLowerCase().startsWith("en-gb")) ||
+    state.voices.find((voice) => voice.lang.toLowerCase().startsWith("en-ie")) ||
     state.voices.find((voice) => voice.lang.toLowerCase().startsWith(langPrefix)) ||
     null
   );
 }
 
-function speakText(text, lang = "en-US") {
-  return new Promise((resolve) => {
-    const clean = String(text || "").trim();
-    if (!clean || !("speechSynthesis" in window)) {
-      resolve();
-      return;
-    }
+async function speakText(text, lang = "en-US", token = state.playbackToken) {
+  const clean = String(text || "").trim();
+  if (!clean || token !== state.playbackToken || !("speechSynthesis" in window)) {
+    return;
+  }
+  if (!(await settleSpeechEngine(token))) return;
 
+  return new Promise((resolve) => {
     const utterance = new SpeechSynthesisUtterance(clean);
     utterance.lang = lang;
     utterance.rate = Number(state.settings.rate);
     utterance.pitch = 1;
     if (lang.startsWith("en")) {
       const voice = getVoice("en");
-      if (voice) utterance.voice = voice;
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+      }
     }
     utterance.onend = resolve;
     utterance.onerror = resolve;
+    window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);
   });
 }
 
-async function speakWord(word) {
-  if (!word || state.speaking) return;
+async function speakWord(word, token = state.playbackToken) {
+  if (!word || token !== state.playbackToken) return;
+  if (state.speaking && state.activeSpeechToken === token) return;
   state.speaking = true;
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
+  state.activeSpeechToken = token;
 
-  const repeatCount = Number(state.settings.repeat);
-  for (let i = 0; i < repeatCount && state.playing; i += 1) {
-    await speakText(word.term, "en-US");
-    await wait(state.settings.gap);
-  }
+  try {
+    const repeatCount = Number(state.settings.repeat);
+    for (let i = 0; i < repeatCount && state.playing && token === state.playbackToken; i += 1) {
+      await speakText(word.term, "en-US", token);
+      if (token === state.playbackToken) await wait(state.settings.gap);
+    }
 
-  if (state.settings.shadowing && state.playing) {
-    state.shadowingNow = true;
-    updateScreen();
-    await speakText("Your turn.", "en-US");
-    await wait(state.settings.shadowGap);
-    state.shadowingNow = false;
-    updateScreen();
-  }
+    if (state.settings.shadowing && state.playing && token === state.playbackToken) {
+      state.shadowingNow = true;
+      updateScreen();
+      await speakText("Your turn.", "en-US", token);
+      if (token === state.playbackToken) await wait(state.settings.shadowGap);
+      state.shadowingNow = false;
+      updateScreen();
+    }
 
-  if (state.settings.speakMeaning && word.meaning && state.playing) {
-    await speakText(word.meaning, "zh-CN");
-    await wait(state.settings.gap);
-  }
+    if (state.settings.speakMeaning && word.meaning && state.playing && token === state.playbackToken) {
+      await speakText(cleanMeaningText(word.meaning), "zh-CN", token);
+      if (token === state.playbackToken) await wait(state.settings.gap);
+    }
 
-  if (state.settings.speakSentence && word.sentence && state.playing) {
-    await speakText(word.sentence, "en-US");
-    await wait(state.settings.gap);
-  }
+    if (state.settings.speakSentence && word.sentence && state.playing && token === state.playbackToken) {
+      await speakText(word.sentence, "en-US", token);
+      if (token === state.playbackToken) await wait(state.settings.gap);
+    }
 
-  word.listenCount = (word.listenCount || 0) + 1;
-  saveWords();
-  state.speaking = false;
+    if (token === state.playbackToken) {
+      word.listenCount = (word.listenCount || 0) + 1;
+    }
+  } finally {
+    if (state.activeSpeechToken === token) {
+      state.speaking = false;
+      state.activeSpeechToken = 0;
+    }
+  }
 }
 
 async function playLoop() {
@@ -1164,35 +1322,56 @@ async function playLoop() {
     return;
   }
 
+  interruptSpeech();
+  const token = state.playbackToken;
   state.playing = true;
+  state.playbackMode = "loop";
   updateScreen();
 
-  while (state.playing && getCurrentWord()) {
-    await speakWord(getCurrentWord());
-    if (!state.playing) break;
-    setNextIndex(1);
+  while (state.playing && getCurrentWord() && token === state.playbackToken) {
+    await speakWord(getCurrentWord(), token);
+    if (state.playing && token === state.playbackToken) await wait(state.settings.gap);
   }
 
-  stopPlayback();
+  if (token === state.playbackToken) stopPlayback();
 }
 
 function stopPlayback() {
+  interruptSpeech();
   state.playing = false;
-  state.speaking = false;
-  state.shadowingNow = false;
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
+  state.playbackMode = "";
   updateScreen();
 }
 
-async function speakOnce(word) {
-  const wasPlaying = state.playing;
+async function speakOnce(word, { interrupt = false } = {}) {
+  if (!word) return;
+  if (interrupt) {
+    interruptSpeech();
+    state.playing = false;
+  }
+  const token = state.playbackToken;
   state.playing = true;
+  state.playbackMode = "once";
   updateScreen();
-  await speakWord(word);
-  state.playing = wasPlaying;
-  updateScreen();
+  await speakWord(word, token);
+  if (token === state.playbackToken) {
+    state.playing = false;
+    state.playbackMode = "";
+    updateScreen();
+  }
+}
+
+function moveAndPlay(direction) {
+  const keepLooping = state.playing && state.playbackMode === "loop";
+  interruptSpeech();
+  state.playing = false;
+  state.playbackMode = "";
+  setNextIndex(direction);
+  if (keepLooping) {
+    playLoop();
+  } else {
+    speakOnce(getCurrentWord(), { interrupt: true });
+  }
 }
 
 function toggleKnown(id) {
@@ -1202,6 +1381,7 @@ function toggleKnown(id) {
   if (word.known) {
     word.hard = false;
   }
+  state.wordListDirty = true;
   saveWords();
   updateScreen();
 }
@@ -1213,6 +1393,7 @@ function toggleHard(id) {
   if (word.hard) {
     word.known = false;
   }
+  state.wordListDirty = true;
   saveWords();
   updateScreen();
 }
@@ -1222,6 +1403,7 @@ function removeWord(id) {
   if (index < 0) return;
   state.words.splice(index, 1);
   state.index = Math.min(state.index, Math.max(0, getPlayableWords().length - 1));
+  state.wordListDirty = true;
   saveWords();
   updateScreen();
 }
@@ -1243,21 +1425,31 @@ function renderVoices() {
     return;
   }
 
-  state.voices = window.speechSynthesis
-    .getVoices()
-    .filter((voice) => voice.lang.toLowerCase().startsWith("en"))
-    .sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+  const naturalVoices = window.speechSynthesis.getVoices().filter(isNaturalEnglishVoice);
+  const britishStyleVoices = naturalVoices.filter(hasBritishStyleAccent);
+  state.voices = (britishStyleVoices.length ? britishStyleVoices : naturalVoices).sort(
+    (a, b) =>
+      getVoiceLangRank(a) - getVoiceLangRank(b) ||
+      getVoiceQualityRank(a) - getVoiceQualityRank(b) ||
+      a.name.localeCompare(b.name)
+  );
 
   if (!state.voices.length) {
     els.voiceSelect.innerHTML = `<option>使用默认英文语音</option>`;
     return;
   }
 
+  if (!state.voices.some((voice) => voice.name === state.settings.voiceName)) {
+    const preferred = state.voices.find((voice) => voice.lang.toLowerCase().startsWith("en-gb")) || state.voices[0];
+    state.settings.voiceName = preferred.name;
+    saveSettings();
+  }
+
   els.voiceSelect.textContent = "";
   state.voices.forEach((voice) => {
     const option = document.createElement("option");
     option.value = voice.name;
-    option.textContent = `${voice.name} · ${voice.lang}`;
+    option.textContent = describeVoice(voice);
     option.selected = voice.name === state.settings.voiceName;
     els.voiceSelect.append(option);
   });
@@ -1273,15 +1465,11 @@ function bindEvents() {
   });
 
   els.prevBtn.addEventListener("click", () => {
-    stopPlayback();
-    setNextIndex(-1);
-    speakOnce(getCurrentWord());
+    moveAndPlay(-1);
   });
 
   els.nextBtn.addEventListener("click", () => {
-    stopPlayback();
-    setNextIndex(1);
-    speakOnce(getCurrentWord());
+    moveAndPlay(1);
   });
 
   els.familiarBtn.addEventListener("click", () => {
@@ -1418,10 +1606,14 @@ function bindEvents() {
     }
   });
 
-  els.searchInput.addEventListener("input", renderWordList);
+  els.searchInput.addEventListener("input", () => {
+    state.wordListDirty = true;
+    renderWordList();
+  });
   els.exportBtn.addEventListener("click", exportWords);
   els.clearDoneBtn.addEventListener("click", () => {
     state.settings.hideKnown = !state.settings.hideKnown;
+    state.wordListDirty = true;
     saveSettings();
     updateScreen();
   });
@@ -1430,6 +1622,7 @@ function bindEvents() {
     if (confirm("确定清空所有词条吗？")) {
       stopPlayback();
       state.words = [];
+      state.wordListDirty = true;
       saveWords();
       updateScreen();
     }
