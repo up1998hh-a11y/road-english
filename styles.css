@@ -194,7 +194,7 @@ h2 {
 
 #currentTerm {
   align-self: end;
-  overflow: hidden;
+  overflow: visible;
   overflow-wrap: normal;
   margin: 12px 0 0;
   max-width: 100%;

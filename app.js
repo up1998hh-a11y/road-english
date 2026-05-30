@@ -604,6 +604,23 @@ function getDisplayMeaning(word) {
   return cleanMeaningText(word?.meaning) || getEmbeddedMeaning(word);
 }
 
+function fitCurrentTerm() {
+  const term = els.currentTerm;
+  if (!term) return;
+  term.style.removeProperty("font-size");
+
+  window.requestAnimationFrame(() => {
+    const available = term.clientWidth;
+    const actual = term.scrollWidth;
+    if (!available || !actual || actual <= available) return;
+
+    const style = window.getComputedStyle(term);
+    const currentSize = Number.parseFloat(style.fontSize);
+    const fittedSize = Math.max(28, Math.floor(currentSize * (available / actual) * 0.98));
+    term.style.fontSize = `${fittedSize}px`;
+  });
+}
+
 function updateScreen() {
   const playable = getPlayableWords();
   const word = getCurrentWord();
@@ -681,6 +698,8 @@ function updateScreen() {
     autoTranslateWord(word);
     autoFillPhonetic(word);
   }
+
+  fitCurrentTerm();
 
   els.rateInput.value = state.settings.rate;
   els.rateValue.textContent = `${Number(state.settings.rate).toFixed(2).replace(/0$/, "")}x`;
@@ -1760,6 +1779,8 @@ function bindEvents() {
     await state.deferredInstallPrompt.userChoice;
     state.deferredInstallPrompt = null;
   });
+
+  window.addEventListener("resize", fitCurrentTerm);
 
   document.addEventListener("visibilitychange", () => {
     if (!("speechSynthesis" in window)) return;
