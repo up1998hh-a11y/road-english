@@ -1081,6 +1081,7 @@ function getPhoneUrl() {
 }
 
 function showInstallHelp() {
+  if (!els.phoneUrlText || !els.installDialog) return;
   const phoneUrl = getPhoneUrl();
   els.phoneUrlText.textContent =
     phoneUrl.includes("电脑IP地址")
@@ -1715,7 +1716,7 @@ function bindEvents() {
     state.deferredInstallPrompt = event;
   });
 
-  els.installBtn.addEventListener("click", async () => {
+  els.installBtn?.addEventListener("click", async () => {
     if (!state.deferredInstallPrompt) {
       showInstallHelp();
       return;
