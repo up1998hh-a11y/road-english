@@ -629,14 +629,14 @@ function updateScreen() {
     : state.settings.shuffle
       ? state.settings.hardOnly
         ? "难词随机"
-        : "随机列表"
+        : "列表随机"
       : state.settings.hardOnly
-        ? "难词顺序"
-        : "顺序列表";
+        ? "难词循环"
+        : "列表循环";
   els.repeatBtn.textContent = `重复 ${state.settings.repeat} 次`;
   els.loopCurrentBtn.textContent = state.settings.loopCurrent ? "正在循环" : "循环本词";
   els.hardModeBtn.textContent = state.settings.hardOnly ? "只听难词" : "全部词库";
-  els.shuffleBtn.textContent = state.settings.shuffle ? "随机列表" : "顺序列表";
+  els.shuffleBtn.textContent = state.settings.shuffle ? "列表随机" : "列表循环";
   els.shadowBtn.textContent = state.settings.shadowing ? "跟读开启" : "跟读关闭";
   els.familiarBtn.disabled = !word;
   els.hardBtn.disabled = !word;
