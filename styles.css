@@ -64,7 +64,7 @@ button:disabled {
   width: min(100%, 560px);
   min-height: 100svh;
   margin: 0 auto;
-  padding: max(18px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  padding: max(12px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
 }
 
 .topbar {
@@ -72,10 +72,9 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 4px 2px 12px;
+  padding: 0 2px 8px;
 }
 
-.eyebrow,
 .section-label,
 .term-meta {
   margin: 0;
@@ -87,8 +86,9 @@ button:disabled {
 }
 
 h1 {
-  margin: 1px 0 0;
-  font-size: clamp(1.25rem, 5.8vw, 1.7rem);
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(1rem, 4vw, 1.2rem);
   line-height: 1.1;
   letter-spacing: 0;
 }
