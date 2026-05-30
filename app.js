@@ -225,6 +225,7 @@ const els = {
   familiarBtn: $("#familiarBtn"),
   hardBtn: $("#hardBtn"),
   repeatBtn: $("#repeatBtn"),
+  loopCurrentBtn: $("#loopCurrentBtn"),
   hardModeBtn: $("#hardModeBtn"),
   shuffleBtn: $("#shuffleBtn"),
   shadowBtn: $("#shadowBtn"),
@@ -589,11 +590,13 @@ function updateScreen() {
         ? "难词顺序"
         : "顺序列表";
   els.repeatBtn.textContent = `重复 ${state.settings.repeat} 次`;
+  els.loopCurrentBtn.textContent = state.settings.loopCurrent ? "正在循环" : "循环本词";
   els.hardModeBtn.textContent = state.settings.hardOnly ? "只听难词" : "全部词库";
-  els.shuffleBtn.textContent = state.settings.loopCurrent ? "单词循环" : state.settings.shuffle ? "随机列表" : "顺序列表";
+  els.shuffleBtn.textContent = state.settings.shuffle ? "随机列表" : "顺序列表";
   els.shadowBtn.textContent = state.settings.shadowing ? "跟读开启" : "跟读关闭";
   els.familiarBtn.disabled = !word;
   els.hardBtn.disabled = !word;
+  els.loopCurrentBtn.disabled = !word;
   els.hardModeBtn.disabled = !hard && !state.settings.hardOnly;
   els.prevBtn.disabled = !word;
   els.nextBtn.disabled = !word;
@@ -607,6 +610,7 @@ function updateScreen() {
   termCard.classList.toggle("long-term", Boolean(word && getDisplayTerm(word).length > 10));
   els.familiarBtn.classList.toggle("active-known", Boolean(word?.known));
   els.hardBtn.classList.toggle("active-hard", Boolean(word?.hard));
+  els.loopCurrentBtn.classList.toggle("active-loop", Boolean(state.settings.loopCurrent));
   els.hardModeBtn.classList.toggle("active-hard", Boolean(state.settings.hardOnly));
 
   if (!word) {
@@ -1535,6 +1539,12 @@ function bindEvents() {
     updateScreen();
   });
 
+  els.loopCurrentBtn.addEventListener("click", () => {
+    state.settings.loopCurrent = !state.settings.loopCurrent;
+    saveSettings();
+    updateScreen();
+  });
+
   els.hardModeBtn.addEventListener("click", () => {
     state.settings.hardOnly = !state.settings.hardOnly;
     state.index = 0;
@@ -1549,15 +1559,7 @@ function bindEvents() {
   });
 
   els.shuffleBtn.addEventListener("click", () => {
-    if (!state.settings.shuffle && !state.settings.loopCurrent) {
-      state.settings.shuffle = true;
-    } else if (state.settings.shuffle && !state.settings.loopCurrent) {
-      state.settings.shuffle = false;
-      state.settings.loopCurrent = true;
-    } else {
-      state.settings.shuffle = false;
-      state.settings.loopCurrent = false;
-    }
+    state.settings.shuffle = !state.settings.shuffle;
     saveSettings();
     updateScreen();
   });

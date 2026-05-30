@@ -321,6 +321,12 @@ h2 {
   color: #a9361f;
 }
 
+.quick-actions button.active-loop {
+  border-color: rgba(212, 154, 42, 0.42);
+  background: #fff4d8;
+  color: #7a5310;
+}
+
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
