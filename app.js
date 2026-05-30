@@ -176,9 +176,6 @@ const roboticVoicePatterns = [
   /albert/i,
   /bahh/i,
   /hysterical/i,
-  /junior/i,
-  /kathy/i,
-  /ralph/i,
   /wobble/i,
 ];
 
@@ -1255,12 +1252,14 @@ function hasBritishStyleAccent(voice) {
   return britishStyleVoiceLangs.some((prefix) => lang.startsWith(prefix)) || lang.includes("gbsct") || lang.includes("gbwls");
 }
 
-function hasPreferredEnglishAccent(voice) {
+function hasCoreBritishAccent(voice) {
   const lang = voice.lang.toLowerCase();
-  return (
-    hasBritishStyleAccent(voice) ||
-    americanStyleVoiceLangs.some((prefix) => lang.startsWith(prefix))
-  );
+  return lang.startsWith("en-gb") || lang.includes("gbsct") || lang.includes("gbwls");
+}
+
+function hasAmericanStyleAccent(voice) {
+  const lang = voice.lang.toLowerCase();
+  return americanStyleVoiceLangs.some((prefix) => lang.startsWith(prefix));
 }
 
 function getVoiceQualityRank(voice) {
@@ -1270,15 +1269,40 @@ function getVoiceQualityRank(voice) {
   return 2;
 }
 
-function pickBestVoices(voices) {
-  const ranked = voices.sort(
+function sortVoices(voices) {
+  return [...voices].sort(
     (a, b) =>
       getVoiceLangRank(a) - getVoiceLangRank(b) ||
       getVoiceQualityRank(a) - getVoiceQualityRank(b) ||
       a.name.localeCompare(b.name)
   );
-  const highQuality = ranked.filter((voice) => getVoiceQualityRank(voice) === 0);
-  return highQuality.length ? highQuality : ranked.slice(0, 8);
+}
+
+function addVoiceGroup(target, voices, limit) {
+  sortVoices(voices).forEach((voice) => {
+    if (target.length >= limit) return;
+    if (!target.some((item) => item.name === voice.name)) target.push(voice);
+  });
+}
+
+function pickVoicesByAccent(voices) {
+  const british = voices.filter(hasCoreBritishAccent);
+  const american = voices.filter(hasAmericanStyleAccent);
+  const other = voices.filter((voice) => !hasBritishStyleAccent(voice) && !hasAmericanStyleAccent(voice));
+  const nearBritish = voices.filter((voice) => hasBritishStyleAccent(voice) && !hasCoreBritishAccent(voice));
+  const selected = [];
+
+  addVoiceGroup(selected, british.filter((voice) => getVoiceQualityRank(voice) === 0), 3);
+  addVoiceGroup(selected, british, 3);
+  addVoiceGroup(selected, american.filter((voice) => getVoiceQualityRank(voice) === 0), 6);
+  addVoiceGroup(selected, american, 6);
+  addVoiceGroup(selected, other.filter((voice) => getVoiceQualityRank(voice) === 0), 9);
+  addVoiceGroup(selected, other, 9);
+  addVoiceGroup(selected, nearBritish.filter((voice) => getVoiceQualityRank(voice) === 0), 9);
+  addVoiceGroup(selected, nearBritish, 9);
+  addVoiceGroup(selected, voices, 9);
+
+  return selected;
 }
 
 function describeVoice(voice) {
@@ -1498,8 +1522,7 @@ function renderVoices() {
   }
 
   const naturalVoices = window.speechSynthesis.getVoices().filter(isNaturalEnglishVoice);
-  const preferredVoices = naturalVoices.filter(hasPreferredEnglishAccent);
-  state.voices = pickBestVoices(preferredVoices.length ? preferredVoices : naturalVoices);
+  state.voices = pickVoicesByAccent(naturalVoices);
 
   if (!state.voices.length) {
     els.voiceSelect.innerHTML = `<option>使用默认英文语音</option>`;
