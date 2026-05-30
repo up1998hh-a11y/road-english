@@ -131,8 +131,30 @@ const basicPhonetics = {
 };
 
 const britishStyleVoiceLangs = ["en-gb", "en-ie", "en-au", "en-nz", "en-za"];
-const preferredEnglishVoiceLangs = [...britishStyleVoiceLangs, "en-ca", "en-us"];
-const highQualityVoicePatterns = [/enhanced/i, /premium/i, /neural/i, /natural/i, /siri/i, /优化音质/i, /精品/i];
+const americanStyleVoiceLangs = ["en-us", "en-ca"];
+const preferredEnglishVoiceLangs = ["en-gb", "en-us", "en-ca", "en-ie", "en-au", "en-nz", "en-za"];
+const highQualityVoicePatterns = [
+  /enhanced/i,
+  /premium/i,
+  /neural/i,
+  /natural/i,
+  /siri/i,
+  /优化音质/i,
+  /精品/i,
+  /alex/i,
+  /allison/i,
+  /ava/i,
+  /joelle/i,
+  /joey/i,
+  /kendra/i,
+  /kimberly/i,
+  /matthew/i,
+  /nicky/i,
+  /samantha/i,
+  /susan/i,
+  /tom/i,
+  /zoe/i,
+];
 const roboticVoicePatterns = [
   /compact/i,
   /eloquence/i,
@@ -152,6 +174,12 @@ const roboticVoicePatterns = [
   /good news/i,
   /fred/i,
   /albert/i,
+  /bahh/i,
+  /hysterical/i,
+  /junior/i,
+  /kathy/i,
+  /ralph/i,
+  /wobble/i,
 ];
 
 const defaultSettings = {
@@ -1208,11 +1236,30 @@ function hasBritishStyleAccent(voice) {
   return britishStyleVoiceLangs.some((prefix) => lang.startsWith(prefix)) || lang.includes("gbsct") || lang.includes("gbwls");
 }
 
+function hasPreferredEnglishAccent(voice) {
+  const lang = voice.lang.toLowerCase();
+  return (
+    hasBritishStyleAccent(voice) ||
+    americanStyleVoiceLangs.some((prefix) => lang.startsWith(prefix))
+  );
+}
+
 function getVoiceQualityRank(voice) {
   const name = voice.name;
   if (highQualityVoicePatterns.some((pattern) => pattern.test(name))) return 0;
   if (voice.localService) return 1;
   return 2;
+}
+
+function pickBestVoices(voices) {
+  const ranked = voices.sort(
+    (a, b) =>
+      getVoiceLangRank(a) - getVoiceLangRank(b) ||
+      getVoiceQualityRank(a) - getVoiceQualityRank(b) ||
+      a.name.localeCompare(b.name)
+  );
+  const highQuality = ranked.filter((voice) => getVoiceQualityRank(voice) === 0);
+  return highQuality.length ? highQuality : ranked.slice(0, 8);
 }
 
 function describeVoice(voice) {
@@ -1432,13 +1479,8 @@ function renderVoices() {
   }
 
   const naturalVoices = window.speechSynthesis.getVoices().filter(isNaturalEnglishVoice);
-  const britishStyleVoices = naturalVoices.filter(hasBritishStyleAccent);
-  state.voices = (britishStyleVoices.length ? britishStyleVoices : naturalVoices).sort(
-    (a, b) =>
-      getVoiceLangRank(a) - getVoiceLangRank(b) ||
-      getVoiceQualityRank(a) - getVoiceQualityRank(b) ||
-      a.name.localeCompare(b.name)
-  );
+  const preferredVoices = naturalVoices.filter(hasPreferredEnglishAccent);
+  state.voices = pickBestVoices(preferredVoices.length ? preferredVoices : naturalVoices);
 
   if (!state.voices.length) {
     els.voiceSelect.innerHTML = `<option>使用默认英文语音</option>`;
@@ -1446,7 +1488,12 @@ function renderVoices() {
   }
 
   if (!state.voices.some((voice) => voice.name === state.settings.voiceName)) {
-    const preferred = state.voices.find((voice) => voice.lang.toLowerCase().startsWith("en-gb")) || state.voices[0];
+    const preferred =
+      state.voices.find((voice) => voice.lang.toLowerCase().startsWith("en-gb") && getVoiceQualityRank(voice) === 0) ||
+      state.voices.find((voice) => voice.lang.toLowerCase().startsWith("en-us") && getVoiceQualityRank(voice) === 0) ||
+      state.voices.find((voice) => voice.lang.toLowerCase().startsWith("en-gb")) ||
+      state.voices.find((voice) => voice.lang.toLowerCase().startsWith("en-us")) ||
+      state.voices[0];
     state.settings.voiceName = preferred.name;
     saveSettings();
   }
