@@ -236,7 +236,6 @@ const els = {
   singleForm: $("#singleForm"),
   termInput: $("#termInput"),
   meaningInput: $("#meaningInput"),
-  phoneticInput: $("#phoneticInput"),
   sentenceInput: $("#sentenceInput"),
   moreFieldsBtn: $("#moreFieldsBtn"),
   extraFields: $("#extraFields"),
@@ -1574,7 +1573,6 @@ function bindEvents() {
       const word = createWord({
         term,
         meaning,
-        phonetic: els.phoneticInput.value,
         sentence: els.sentenceInput.value,
       });
       const result = addWords([word]);
