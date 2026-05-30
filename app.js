@@ -3,6 +3,7 @@ const SETTINGS_KEY = "drive-english-settings-v1";
 const TRANSLATION_CACHE_KEY = "drive-english-translation-cache-v1";
 const PHONETIC_CACHE_KEY = "drive-english-phonetic-cache-v1";
 const CLOUD_SETTINGS_KEY = "drive-english-cloud-settings-v1";
+const PLAN_KEY = "drive-english-plan-v1";
 const DB_NAME = "drive-english-db";
 const DB_VERSION = 1;
 const WORDS_STORE = "words";
@@ -176,10 +177,16 @@ const defaultCloudSettings = {
   autoSync: false,
 };
 
+const defaultPlan = {
+  date: "",
+  target: 30,
+};
+
 const state = {
   words: loadWords(),
   settings: loadSettings(),
   cloud: loadCloudSettings(),
+  plan: loadPlan(),
   index: 0,
   playing: false,
   speaking: false,
@@ -230,8 +237,10 @@ const els = {
   shuffleBtn: $("#shuffleBtn"),
   shadowBtn: $("#shadowBtn"),
   tabs: document.querySelectorAll(".tab"),
+  tabsNav: $(".tabs"),
   panels: {
     add: $("#addPanel"),
+    plan: $("#planPanel"),
     library: $("#libraryPanel"),
     settings: $("#settingsPanel"),
   },
@@ -256,6 +265,21 @@ const els = {
   clearAllBtn: $("#clearAllBtn"),
   wordList: $("#wordList"),
   template: $("#wordItemTemplate"),
+  planSummary: $("#planSummary"),
+  planRate: $("#planRate"),
+  planDateInput: $("#planDateInput"),
+  planTargetInput: $("#planTargetInput"),
+  savePlanBtn: $("#savePlanBtn"),
+  planProgressBar: $("#planProgressBar"),
+  statTotal: $("#statTotal"),
+  statKnown: $("#statKnown"),
+  statLearning: $("#statLearning"),
+  statHard: $("#statHard"),
+  planStatus: $("#planStatus"),
+  hardListCount: $("#hardListCount"),
+  knownListCount: $("#knownListCount"),
+  hardFocusList: $("#hardFocusList"),
+  knownFocusList: $("#knownFocusList"),
   voiceSelect: $("#voiceSelect"),
   rateInput: $("#rateInput"),
   rateValue: $("#rateValue"),
@@ -323,6 +347,17 @@ function loadCloudSettings() {
     };
   } catch {
     return { ...defaultCloudSettings };
+  }
+}
+
+function loadPlan() {
+  try {
+    return {
+      ...defaultPlan,
+      ...JSON.parse(window.localStorage.getItem(PLAN_KEY) || "{}"),
+    };
+  } catch {
+    return { ...defaultPlan };
   }
 }
 
@@ -452,6 +487,15 @@ function savePhoneticCache() {
 function saveCloudSettings() {
   try {
     window.localStorage.setItem(CLOUD_SETTINGS_KEY, JSON.stringify(state.cloud));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function savePlan() {
+  try {
+    window.localStorage.setItem(PLAN_KEY, JSON.stringify(state.plan));
     return true;
   } catch {
     return false;
@@ -665,6 +709,7 @@ function updateScreen() {
   if (state.wordListDirty) {
     renderWordList();
   }
+  updatePlanPanel();
 }
 
 function renderWordList() {
@@ -723,6 +768,65 @@ function renderWordList() {
     deleteBtn.addEventListener("click", () => removeWord(word.id));
     els.wordList.append(node);
   });
+}
+
+function getPlanDateLabel() {
+  if (!state.plan.date) return "未设置日期";
+  const date = new Date(`${state.plan.date}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return state.plan.date;
+  return date.toLocaleDateString("zh-CN", { month: "long", day: "numeric" });
+}
+
+function renderMiniWordList(container, words, emptyText) {
+  container.textContent = "";
+  if (!words.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-mini";
+    empty.textContent = emptyText;
+    container.append(empty);
+    return;
+  }
+
+  words.slice(0, 12).forEach((word) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mini-word";
+    button.innerHTML = `
+      <strong>${escapeHtml(getDisplayTerm(word))}</strong>
+      <span>${escapeHtml(getDisplayMeaning(word) || "可补充释义")}</span>
+    `;
+    button.addEventListener("click", () => {
+      setCurrentWordById(word.id);
+      switchTab("add");
+      speakOnce(word, { interrupt: true });
+    });
+    container.append(button);
+  });
+}
+
+function updatePlanPanel() {
+  const total = state.words.length;
+  const knownWords = state.words.filter((word) => word.known);
+  const hardWords = state.words.filter((word) => word.hard);
+  const known = knownWords.length;
+  const hard = hardWords.length;
+  const learning = Math.max(0, total - known);
+  const target = Math.max(1, Number(state.plan.target) || defaultPlan.target);
+  const rate = Math.min(100, Math.round((known / target) * 100));
+
+  els.planDateInput.value = state.plan.date || new Date().toISOString().slice(0, 10);
+  els.planTargetInput.value = target;
+  els.planRate.textContent = `${rate}%`;
+  els.planSummary.textContent = `${getPlanDateLabel()} 目标 ${target} 个，已熟悉 ${known} 个，还差 ${Math.max(0, target - known)} 个。`;
+  els.planProgressBar.style.width = `${rate}%`;
+  els.statTotal.textContent = total;
+  els.statKnown.textContent = known;
+  els.statLearning.textContent = learning;
+  els.statHard.textContent = hard;
+  els.hardListCount.textContent = `${hard} 个`;
+  els.knownListCount.textContent = `${known} 个`;
+  renderMiniWordList(els.hardFocusList, hardWords, "还没有难词。遇到卡住的词，点“标记难词”。");
+  renderMiniWordList(els.knownFocusList, knownWords, "还没有熟悉词。会的词可以点“标记熟悉”。");
 }
 
 function escapeHtml(value) {
@@ -951,6 +1055,8 @@ function switchTab(tabName) {
     panel.classList.toggle("active", active);
   });
 }
+
+window.switchRoadEnglishTab = switchTab;
 
 function setBulkStatus(message) {
   els.bulkStatus.textContent = message;
@@ -1564,8 +1670,10 @@ function bindEvents() {
     updateScreen();
   });
 
-  els.tabs.forEach((tab) => {
-    tab.addEventListener("click", () => switchTab(tab.dataset.tab));
+  els.tabsNav.addEventListener("click", (event) => {
+    const tab = event.target.closest(".tab");
+    if (!tab) return;
+    switchTab(tab.dataset.tab);
   });
 
   els.moreFieldsBtn.addEventListener("click", () => {
@@ -1684,6 +1792,14 @@ function bindEvents() {
     }
   });
 
+  els.savePlanBtn.addEventListener("click", () => {
+    state.plan.date = els.planDateInput.value || new Date().toISOString().slice(0, 10);
+    state.plan.target = Math.max(1, Math.round(Number(els.planTargetInput.value) || defaultPlan.target));
+    const saved = savePlan();
+    updatePlanPanel();
+    els.planStatus.textContent = saved ? "计划已保存。" : "计划没有保存成功，可以稍后再试。";
+  });
+
   els.voiceSelect.addEventListener("change", () => {
     state.settings.voiceName = els.voiceSelect.value;
     saveSettings();
@@ -1795,6 +1911,10 @@ function registerServiceWorker() {
 
 async function init() {
   try {
+    if (!state.plan.date) {
+      state.plan.date = new Date().toISOString().slice(0, 10);
+      savePlan();
+    }
     await hydrateFromDatabase();
     bindEvents();
     renderVoices();
