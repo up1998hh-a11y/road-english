@@ -639,7 +639,7 @@ function updateScreen() {
   const termCard = document.querySelector(".term-card");
   termCard.classList.toggle("known-current", Boolean(word?.known));
   termCard.classList.toggle("hard-current", Boolean(word?.hard));
-  termCard.classList.toggle("long-term", Boolean(word && getDisplayTerm(word).length > 10));
+  termCard.classList.toggle("long-term", Boolean(word && getDisplayTerm(word).length > 8));
   els.familiarBtn.classList.toggle("active-known", Boolean(word?.known));
   els.hardBtn.classList.toggle("active-hard", Boolean(word?.hard));
   els.loopCurrentBtn.classList.toggle("active-loop", Boolean(state.settings.loopCurrent));
