@@ -595,7 +595,7 @@ function updateScreen() {
         : "列表循环";
   els.repeatBtn.textContent = `重复 ${state.settings.repeat} 次`;
   els.loopCurrentBtn.textContent = state.settings.loopCurrent ? "正在循环" : "循环本词";
-  els.hardModeBtn.textContent = state.settings.hardOnly ? "只听难词" : "全部词库";
+  els.hardModeBtn.textContent = state.settings.hardOnly ? "听全部词" : hard ? "只听难词" : "暂无难词";
   els.shuffleBtn.textContent = state.settings.shuffle ? "列表随机" : "列表循环";
   els.shadowBtn.textContent = state.settings.shadowing ? "跟读开启" : "跟读关闭";
   els.familiarBtn.disabled = !word;
