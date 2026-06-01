@@ -299,6 +299,7 @@ const els = {
   hardFocusList: $("#hardFocusList"),
   knownFocusList: $("#knownFocusList"),
   voiceSelect: $("#voiceSelect"),
+  voiceNote: $("#voiceNote"),
   rateInput: $("#rateInput"),
   rateValue: $("#rateValue"),
   gapInput: $("#gapInput"),
@@ -1528,6 +1529,7 @@ function exportWords() {
 function renderVoices() {
   if (!("speechSynthesis" in window)) {
     els.voiceSelect.innerHTML = `<option>当前浏览器不支持朗读</option>`;
+    els.voiceNote.textContent = "当前浏览器没有开放朗读功能。";
     return;
   }
 
@@ -1536,6 +1538,7 @@ function renderVoices() {
 
   if (!state.voices.length) {
     els.voiceSelect.innerHTML = `<option>使用默认英文语音</option>`;
+    els.voiceNote.textContent = "手机没有提供可选择的英文声音，会使用浏览器默认朗读。";
     return;
   }
 
@@ -1558,6 +1561,8 @@ function renderVoices() {
     option.selected = voice.name === state.settings.voiceName;
     els.voiceSelect.append(option);
   });
+
+  els.voiceNote.textContent = `当前手机提供 ${state.voices.length} 个可用英文声音。想更多：iPhone 设置 -> 辅助功能 -> 朗读内容 -> 声音 -> 英语，下载更多声音后再打开本页。`;
 }
 
 function bindEvents() {
