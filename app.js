@@ -133,6 +133,7 @@ const basicPhonetics = {
 const britishStyleVoiceLangs = ["en-gb", "en-ie", "en-au", "en-nz", "en-za"];
 const americanStyleVoiceLangs = ["en-us", "en-ca"];
 const preferredEnglishVoiceLangs = ["en-gb", "en-us", "en-ca", "en-ie", "en-au", "en-nz", "en-za"];
+const VOICE_LIMIT = 18;
 const highQualityVoicePatterns = [
   /enhanced/i,
   /premium/i,
@@ -176,6 +177,8 @@ const roboticVoicePatterns = [
   /albert/i,
   /bahh/i,
   /hysterical/i,
+  /junior/i,
+  /ralph/i,
   /wobble/i,
 ];
 
@@ -1269,11 +1272,19 @@ function getVoiceQualityRank(voice) {
   return 2;
 }
 
+function getLearnerVoiceRank(voice) {
+  const name = voice.name.toLowerCase();
+  if (/samantha|ava|allison|susan|kendra|kimberly|nicky|joelle|zoe|fiona|daniel|alex|matthew|tom/.test(name)) return 0;
+  if (/moira|karen|tessa|rishi|serena|arthur|martha|oliver/.test(name)) return 1;
+  return 2;
+}
+
 function sortVoices(voices) {
   return [...voices].sort(
     (a, b) =>
       getVoiceLangRank(a) - getVoiceLangRank(b) ||
       getVoiceQualityRank(a) - getVoiceQualityRank(b) ||
+      getLearnerVoiceRank(a) - getLearnerVoiceRank(b) ||
       a.name.localeCompare(b.name)
   );
 }
@@ -1292,15 +1303,14 @@ function pickVoicesByAccent(voices) {
   const nearBritish = voices.filter((voice) => hasBritishStyleAccent(voice) && !hasCoreBritishAccent(voice));
   const selected = [];
 
-  addVoiceGroup(selected, british.filter((voice) => getVoiceQualityRank(voice) === 0), 3);
-  addVoiceGroup(selected, british, 3);
-  addVoiceGroup(selected, american.filter((voice) => getVoiceQualityRank(voice) === 0), 6);
-  addVoiceGroup(selected, american, 6);
-  addVoiceGroup(selected, other.filter((voice) => getVoiceQualityRank(voice) === 0), 9);
-  addVoiceGroup(selected, other, 9);
-  addVoiceGroup(selected, nearBritish.filter((voice) => getVoiceQualityRank(voice) === 0), 9);
-  addVoiceGroup(selected, nearBritish, 9);
-  addVoiceGroup(selected, voices, 9);
+  addVoiceGroup(selected, american.filter((voice) => getVoiceQualityRank(voice) === 0), 4);
+  addVoiceGroup(selected, british.filter((voice) => getVoiceQualityRank(voice) === 0), 8);
+  addVoiceGroup(selected, other.filter((voice) => getVoiceQualityRank(voice) === 0), 12);
+  addVoiceGroup(selected, american, 14);
+  addVoiceGroup(selected, british, 16);
+  addVoiceGroup(selected, nearBritish, 17);
+  addVoiceGroup(selected, other, VOICE_LIMIT);
+  addVoiceGroup(selected, voices, VOICE_LIMIT);
 
   return selected;
 }
