@@ -1,3 +1,90 @@
+function createRoadEnglishCore() {
+  const englishLetterRe = /[A-Za-z]/;
+  const chineseRe = /[\u3400-\u9fff]/;
+  const phoneticRe = /\/[^/]+\/|\[[^\]]+\]/;
+  const defaultDailyNewTarget = 15;
+  const todayIsoDate = () => new Date().toISOString().slice(0, 10);
+  const stripListMarker = (value) =>
+    String(value || "")
+      .trim()
+      .replace(/^[\s\-*•·]+/, "")
+      .replace(/^(?:\d+|[一二三四五六七八九十百千万]+)[、.．)）:：\s]+/, "")
+      .trim();
+  const extractLeadingEnglish = (value) => {
+    const text = stripListMarker(value);
+    const match = text.match(/^[A-Za-z][A-Za-z'’.-]*(?:\s+[A-Za-z][A-Za-z'’.-]*)*/);
+    return match ? match[0].replace(/[.。,:：;；]+$/, "").trim() : "";
+  };
+  const isUsableTerm = (value) => {
+    const term = String(value || "").trim();
+    return Boolean(term && englishLetterRe.test(term) && !chineseRe.test(term));
+  };
+  const normalizeAssignedDate = (value) => {
+    const text = String(value || "").trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+  };
+  const getCurrentStudyDate = (planDate = "") => normalizeAssignedDate(planDate) || todayIsoDate();
+  const splitMeaningFromLine = (line) => {
+    const text = stripListMarker(line);
+    const chineseIndex = text.search(chineseRe);
+    const beforeMeaning = chineseIndex >= 0 ? text.slice(0, chineseIndex).trim() : text;
+    const meaning = chineseIndex >= 0 ? text.slice(chineseIndex).trim() : "";
+    const phoneticMatch = beforeMeaning.match(phoneticRe);
+    const phonetic = phoneticMatch ? phoneticMatch[0] : "";
+    const termSource = phonetic ? beforeMeaning.replace(phonetic, " ").trim() : beforeMeaning;
+    const term = extractLeadingEnglish(termSource);
+    const rest = term ? termSource.slice(term.length).trim() : "";
+    return { term, phonetic, meaning: meaning || rest };
+  };
+  const parseDelimitedLine = (line) => {
+    const parts = line.includes("|") ? line.split(/\s*\|\s*/) : line.split(/\t+/);
+    const term = extractLeadingEnglish(parts[0] || "");
+    if (!isUsableTerm(term)) return null;
+    const hasPhonetic = parts[1] && /[\/\[\]ˈˌəɪʊɑɔæɛɜθðʃʒŋ]/.test(parts[1]);
+    return {
+      term,
+      phonetic: hasPhonetic ? String(parts[1] || "").trim() : "",
+      meaning: hasPhonetic ? String(parts[2] || "").trim() : String(parts[1] || "").trim(),
+      sentence: hasPhonetic ? parts.slice(3).join(" ").trim() : parts.slice(2).join(" ").trim(),
+    };
+  };
+  const parsePlainLine = (line) => {
+    const parsed = splitMeaningFromLine(line);
+    return isUsableTerm(parsed.term)
+      ? { term: parsed.term, phonetic: parsed.phonetic, meaning: parsed.meaning, sentence: "" }
+      : null;
+  };
+  const parseBulkText = (text) =>
+    String(text || "")
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => (line.includes("|") || line.includes("\t") ? parseDelimitedLine(line) : parsePlainLine(line)))
+      .filter(Boolean);
+  return {
+    DEFAULT_DAILY_NEW_TARGET: defaultDailyNewTarget,
+    getCurrentStudyDate,
+    getDailyAssignableWords: (words) => words.filter((word) => word && !word.known && !normalizeAssignedDate(word.assignedDate)),
+    getPlayableWordsForSettings: (words, settings = {}) => {
+      const currentDate = getCurrentStudyDate(settings.currentDate);
+      return words.filter((word) => {
+        if (settings.todayOnly && normalizeAssignedDate(word.assignedDate) !== currentDate) return false;
+        if (settings.hardOnly && !word.hard) return false;
+        if (settings.skipKnown && word.known) return false;
+        return true;
+      });
+    },
+    getTodayWords: (words, date = todayIsoDate()) => {
+      const currentDate = getCurrentStudyDate(date);
+      return words.filter((word) => normalizeAssignedDate(word?.assignedDate) === currentDate);
+    },
+    normalizeAssignedDate,
+    parseBulkText,
+  };
+}
+
+globalThis.RoadEnglishCore = globalThis.RoadEnglishCore || createRoadEnglishCore();
+
 const {
   DEFAULT_DAILY_NEW_TARGET,
   getCurrentStudyDate,
@@ -6,11 +93,7 @@ const {
   getTodayWords,
   normalizeAssignedDate,
   parseBulkText: parseBulkRows,
-} = globalThis.RoadEnglishCore || {};
-
-if (!globalThis.RoadEnglishCore) {
-  throw new Error("学习核心脚本没有加载，请刷新页面。");
-}
+} = globalThis.RoadEnglishCore;
 
 const STORAGE_KEY = "drive-english-v1";
 const SETTINGS_KEY = "drive-english-settings-v1";

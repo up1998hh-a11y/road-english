@@ -1,9 +1,8 @@
-const CACHE_NAME = "drive-english-cache-v46";
+const CACHE_NAME = "drive-english-cache-v47";
 const APP_FILES = [
   "./",
   "./index.html",
   "./styles.css",
-  "./learning-core.js",
   "./app.js",
   "./manifest.json",
   "./icon.svg",
