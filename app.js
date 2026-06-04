@@ -1,3 +1,17 @@
+const {
+  DEFAULT_DAILY_NEW_TARGET,
+  getCurrentStudyDate,
+  getDailyAssignableWords,
+  getPlayableWordsForSettings,
+  getTodayWords,
+  normalizeAssignedDate,
+  parseBulkText: parseBulkRows,
+} = globalThis.RoadEnglishCore || {};
+
+if (!globalThis.RoadEnglishCore) {
+  throw new Error("学习核心脚本没有加载，请刷新页面。");
+}
+
 const STORAGE_KEY = "drive-english-v1";
 const SETTINGS_KEY = "drive-english-settings-v1";
 const TRANSLATION_CACHE_KEY = "drive-english-translation-cache-v1";
@@ -196,11 +210,13 @@ const defaultSettings = {
   hardOnly: false,
   voiceName: "",
   hideKnown: false,
+  todayOnly: true,
 };
 
 const defaultPlan = {
   date: "",
   target: 30,
+  dailyNewTarget: DEFAULT_DAILY_NEW_TARGET,
 };
 
 const state = {
@@ -253,6 +269,7 @@ const els = {
   loopCurrentBtn: $("#loopCurrentBtn"),
   hardModeBtn: $("#hardModeBtn"),
   shuffleBtn: $("#shuffleBtn"),
+  todayModeBtn: $("#todayModeBtn"),
   shadowBtn: $("#shadowBtn"),
   tabs: document.querySelectorAll(".tab"),
   tabsNav: $(".tabs"),
@@ -287,9 +304,14 @@ const els = {
   planRate: $("#planRate"),
   planDateInput: $("#planDateInput"),
   planTargetInput: $("#planTargetInput"),
+  dailyNewInput: $("#dailyNewInput"),
   savePlanBtn: $("#savePlanBtn"),
+  assignTodayBtn: $("#assignTodayBtn"),
+  todayListenBtn: $("#todayListenBtn"),
   planProgressBar: $("#planProgressBar"),
   statTotal: $("#statTotal"),
+  statToday: $("#statToday"),
+  statUnassigned: $("#statUnassigned"),
   statKnown: $("#statKnown"),
   statLearning: $("#statLearning"),
   statHard: $("#statHard"),
@@ -317,7 +339,7 @@ const els = {
 function loadWords() {
   try {
     const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
-    return Array.isArray(saved) ? saved : [];
+    return Array.isArray(saved) ? saved.map(normalizeExistingWord).filter(Boolean) : [];
   } catch {
     return [];
   }
@@ -352,10 +374,15 @@ function loadPhoneticCache() {
 
 function loadPlan() {
   try {
-    return {
+    const saved = {
       ...defaultPlan,
       ...JSON.parse(window.localStorage.getItem(PLAN_KEY) || "{}"),
     };
+    saved.dailyNewTarget = Math.max(
+      1,
+      Math.round(Number(saved.dailyNewTarget) || DEFAULT_DAILY_NEW_TARGET)
+    );
+    return saved;
   } catch {
     return { ...defaultPlan };
   }
@@ -497,7 +524,10 @@ async function hydrateFromDatabase() {
   try {
     const dbWords = await readAllFromStore(WORDS_STORE);
     if (dbWords.length) {
-      state.words = dbWords.sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+      state.words = dbWords
+        .map(normalizeExistingWord)
+        .filter(Boolean)
+        .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
       state.durableStorage = true;
       saveWords();
       return;
@@ -526,6 +556,8 @@ function createWord({ term, meaning = "", phonetic = "", sentence = "" }) {
     sentence: String(sentence || "").trim(),
     known: false,
     hard: false,
+    assignedDate: "",
+    learnedAt: "",
     createdAt: new Date().toISOString(),
     listenCount: 0,
   };
@@ -543,16 +575,27 @@ function normalizeWord(raw) {
   });
   word.known = Boolean(raw.known);
   word.hard = Boolean(raw.hard);
+  word.assignedDate = normalizeAssignedDate(raw.assignedDate);
+  word.learnedAt = String(raw.learnedAt || "").trim();
+  word.createdAt = String(raw.createdAt || word.createdAt);
+  word.listenCount = Number(raw.listenCount) || 0;
+  return word;
+}
+
+function normalizeExistingWord(raw) {
+  const word = normalizeWord(raw);
+  if (!word) return null;
+  word.id = String(raw.id || word.id);
+  word.createdAt = String(raw.createdAt || word.createdAt);
+  word.listenCount = Number(raw.listenCount) || 0;
   return word;
 }
 
 function getPlayableWords() {
-  const list = state.words.filter((word) => {
-    if (state.settings.hardOnly && !word.hard) return false;
-    if (state.settings.skipKnown && word.known) return false;
-    return true;
+  return getPlayableWordsForSettings(state.words, {
+    ...state.settings,
+    currentDate: getCurrentStudyDate(state.plan.date),
   });
-  return list;
 }
 
 function getCurrentWord() {
@@ -628,8 +671,12 @@ function updateScreen() {
   const total = state.words.length;
   const known = state.words.filter((item) => item.known).length;
   const hard = state.words.filter((item) => item.hard).length;
+  const studyDate = getCurrentStudyDate(state.plan.date);
+  const todayCount = getTodayWords(state.words, studyDate).length;
 
-  els.countLabel.textContent = `${total} 个词条${known ? `，${known} 个熟悉` : ""}${hard ? `，${hard} 个难词` : ""}`;
+  els.countLabel.textContent = state.settings.todayOnly
+    ? `今日 ${todayCount} 个词${known ? `，${known} 个熟悉` : ""}${hard ? `，${hard} 个难词` : ""}`
+    : `${total} 个词条${known ? `，${known} 个熟悉` : ""}${hard ? `，${hard} 个难词` : ""}`;
   els.playModeLabel.textContent = state.settings.loopCurrent
     ? "单词循环"
     : state.settings.shuffle
@@ -642,6 +689,7 @@ function updateScreen() {
   els.repeatBtn.textContent = `重复 ${state.settings.repeat} 次`;
   els.loopCurrentBtn.textContent = state.settings.loopCurrent ? "正在循环" : "循环本词";
   els.hardModeBtn.textContent = state.settings.hardOnly ? "听全部词" : hard ? "只听难词" : "暂无难词";
+  els.todayModeBtn.textContent = state.settings.todayOnly ? "今日词" : "全部词";
   els.shuffleBtn.textContent = state.settings.shuffle ? "列表随机" : "列表循环";
   els.shadowBtn.textContent = state.settings.shadowing ? "跟读开启" : "跟读关闭";
   els.familiarBtn.disabled = !word;
@@ -662,13 +710,22 @@ function updateScreen() {
   els.hardBtn.classList.toggle("active-hard", Boolean(word?.hard));
   els.loopCurrentBtn.classList.toggle("active-loop", Boolean(state.settings.loopCurrent));
   els.hardModeBtn.classList.toggle("active-hard", Boolean(state.settings.hardOnly));
+  els.todayModeBtn.classList.toggle("active-loop", Boolean(state.settings.todayOnly));
 
   if (!word) {
     els.termMeta.textContent = total ? "没有待播放词条" : "未开始";
-    els.currentTerm.textContent = total ? (state.settings.hardOnly ? "还没有难词" : "都熟悉了") : "先添加单词";
+    els.currentTerm.textContent = total
+      ? state.settings.todayOnly
+        ? "先生成今日词"
+        : state.settings.hardOnly
+          ? "还没有难词"
+          : "都熟悉了"
+      : "先添加单词";
     els.currentPhonetic.textContent = "";
     els.currentMeaning.textContent = total
-      ? state.settings.hardOnly
+      ? state.settings.todayOnly
+        ? "到“计划”里点生成今日词，开车时就只听今天这批。"
+        : state.settings.hardOnly
         ? "把不会的词标记为难词，就可以在这里循环听。"
         : "关闭“跳过熟悉词”可以继续复习。"
       : "添加后可以一键循环听。";
@@ -750,11 +807,18 @@ function renderWordList() {
     const deleteBtn = node.querySelector(".delete");
     const displayTerm = getDisplayTerm(word);
     const displayMeaning = getDisplayMeaning(word);
+    const studyDate = getCurrentStudyDate(state.plan.date);
+    const assignmentLabel = word.assignedDate
+      ? word.assignedDate === studyDate
+        ? "今日词"
+        : word.assignedDate
+      : "未分配";
 
     main.innerHTML = `
       <strong>${escapeHtml(displayTerm)}</strong>
       ${word.phonetic ? `<em>${escapeHtml(word.phonetic)}</em>` : ""}
       <span>${escapeHtml(displayMeaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义"))}</span>
+      <small>${escapeHtml(assignmentLabel)}</small>
       ${word.sentence ? `<small>${escapeHtml(word.sentence)}</small>` : ""}
     `;
     hard.textContent = word.hard ? "难词中" : "难词";
@@ -783,6 +847,24 @@ function getPlanDateLabel() {
   const date = new Date(`${state.plan.date}T00:00:00`);
   if (Number.isNaN(date.getTime())) return state.plan.date;
   return date.toLocaleDateString("zh-CN", { month: "long", day: "numeric" });
+}
+
+function assignTodayWords(count = state.plan.dailyNewTarget) {
+  const currentDate = getCurrentStudyDate(state.plan.date);
+  const targetCount = Math.max(1, Math.round(Number(count) || DEFAULT_DAILY_NEW_TARGET));
+  const todayCount = getTodayWords(state.words, currentDate).length;
+  const missingCount = Math.max(0, targetCount - todayCount);
+  const candidates = getDailyAssignableWords(state.words);
+  const picked = candidates.slice(0, missingCount);
+  picked.forEach((word) => {
+    word.assignedDate = currentDate;
+  });
+  if (picked.length) {
+    state.wordListDirty = true;
+    saveWords();
+    state.index = 0;
+  }
+  return picked.length;
 }
 
 function renderMiniWordList(container, words, emptyText) {
@@ -816,21 +898,30 @@ function updatePlanPanel() {
   const total = state.words.length;
   const knownWords = state.words.filter((word) => word.known);
   const hardWords = state.words.filter((word) => word.hard);
+  const studyDate = getCurrentStudyDate(state.plan.date);
+  const todayWords = getTodayWords(state.words, studyDate);
+  const unassigned = getDailyAssignableWords(state.words).length;
   const known = knownWords.length;
   const hard = hardWords.length;
   const learning = Math.max(0, total - known);
   const target = Math.max(1, Number(state.plan.target) || defaultPlan.target);
+  const dailyNewTarget = Math.max(1, Number(state.plan.dailyNewTarget) || DEFAULT_DAILY_NEW_TARGET);
   const rate = Math.min(100, Math.round((known / target) * 100));
 
-  els.planDateInput.value = state.plan.date || new Date().toISOString().slice(0, 10);
+  els.planDateInput.value = studyDate;
   els.planTargetInput.value = target;
+  els.dailyNewInput.value = dailyNewTarget;
   els.planRate.textContent = `${rate}%`;
-  els.planSummary.textContent = `${getPlanDateLabel()} 目标 ${target} 个，已熟悉 ${known} 个，还差 ${Math.max(0, target - known)} 个。`;
+  els.planSummary.textContent = `${getPlanDateLabel()} 今日 ${todayWords.length} 个词，未分配 ${unassigned} 个。总目标 ${target}，已熟悉 ${known}。`;
   els.planProgressBar.style.width = `${rate}%`;
   els.statTotal.textContent = total;
+  els.statToday.textContent = todayWords.length;
+  els.statUnassigned.textContent = unassigned;
   els.statKnown.textContent = known;
   els.statLearning.textContent = learning;
   els.statHard.textContent = hard;
+  els.todayListenBtn.textContent = state.settings.todayOnly ? "正在听今日词" : "只听今日词";
+  els.todayListenBtn.classList.toggle("active-scope", Boolean(state.settings.todayOnly));
   els.hardListCount.textContent = `${hard} 个`;
   els.knownListCount.textContent = `${known} 个`;
   renderMiniWordList(els.hardFocusList, hardWords, "还没有难词。遇到卡住的词，点“标记难词”。");
@@ -1026,21 +1117,14 @@ function addWords(words) {
 }
 
 function parseBulkText(text) {
-  return text
+  return parseBulkRows(text).map(createWord);
+}
+
+function countBulkInputLines(text) {
+  return String(text || "")
     .split(/\n+/)
     .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parts = line.includes("|") ? line.split(/\s*\|\s*/) : line.split(/\t+/);
-      const hasPhonetic = parts[1] && /[\/\[\]ˈˌəɪʊɑɔæɛɜθðʃʒŋ]/.test(parts[1]);
-      return createWord({
-        term: parts[0] || "",
-        phonetic: hasPhonetic ? parts[1] || "" : "",
-        meaning: hasPhonetic ? parts[2] || "" : parts[1] || "",
-        sentence: hasPhonetic ? parts.slice(3).join(" ") || "" : parts.slice(2).join(" ") || "",
-      });
-    })
-    .filter((word) => word.term);
+    .filter(Boolean).length;
 }
 
 async function parseFile(file) {
@@ -1487,6 +1571,9 @@ function toggleKnown(id) {
   word.known = !word.known;
   if (word.known) {
     word.hard = false;
+    word.learnedAt = new Date().toISOString();
+  } else {
+    word.learnedAt = "";
   }
   state.wordListDirty = true;
   saveWords();
@@ -1611,6 +1698,13 @@ function bindEvents() {
     updateScreen();
   });
 
+  els.todayModeBtn.addEventListener("click", () => {
+    state.settings.todayOnly = !state.settings.todayOnly;
+    state.index = 0;
+    saveSettings();
+    updateScreen();
+  });
+
   els.shadowBtn.addEventListener("click", () => {
     state.settings.shadowing = !state.settings.shadowing;
     saveSettings();
@@ -1688,20 +1782,26 @@ function bindEvents() {
 
   els.bulkAddBtn.addEventListener("click", () => {
     try {
+      const inputLineCount = countBulkInputLines(els.bulkInput.value);
       const parsed = parseBulkText(els.bulkInput.value);
+      const skipped = Math.max(0, inputLineCount - parsed.length);
       const result = addWords(parsed);
       if (!result.total) {
-        setBulkStatus("先输入要添加的单词。每行可以写：英文 | 中文 | 例句。");
+        setBulkStatus("没有识别到英文单词。中文标题、章节名会自动跳过。");
         return;
       }
       if (result.added) {
         els.bulkInput.value = "";
         const savedText = result.saved ? "" : " 当前打开方式不适合长期保存，建议发布成网页 App 后使用。";
-        setBulkStatus(`已加入 ${result.added} 个词条${result.duplicates ? `，${result.duplicates} 个已存在` : ""}。${savedText}`);
+        setBulkStatus(
+          `已加入 ${result.added} 个词条${result.duplicates ? `，${result.duplicates} 个已存在` : ""}${skipped ? `，已跳过 ${skipped} 行中文标题/无效内容` : ""}。${savedText}`
+        );
         setSingleStatus("");
         switchTab("library");
       } else {
-        setBulkStatus(`这些词已经都在词库里了，可以到“词库”查看。`);
+        setBulkStatus(
+          `这些词已经都在词库里了${skipped ? `，另跳过 ${skipped} 行中文标题/无效内容` : ""}。可以到“词库”查看。`
+        );
         switchTab("library");
       }
     } catch {
@@ -1748,9 +1848,38 @@ function bindEvents() {
   els.savePlanBtn.addEventListener("click", () => {
     state.plan.date = els.planDateInput.value || new Date().toISOString().slice(0, 10);
     state.plan.target = Math.max(1, Math.round(Number(els.planTargetInput.value) || defaultPlan.target));
+    state.plan.dailyNewTarget = Math.max(
+      1,
+      Math.round(Number(els.dailyNewInput.value) || DEFAULT_DAILY_NEW_TARGET)
+    );
     const saved = savePlan();
     updatePlanPanel();
     els.planStatus.textContent = saved ? "计划已保存。" : "计划没有保存成功，可以稍后再试。";
+  });
+
+  els.assignTodayBtn.addEventListener("click", () => {
+    state.plan.date = els.planDateInput.value || new Date().toISOString().slice(0, 10);
+    state.plan.target = Math.max(1, Math.round(Number(els.planTargetInput.value) || defaultPlan.target));
+    state.plan.dailyNewTarget = Math.max(
+      1,
+      Math.round(Number(els.dailyNewInput.value) || DEFAULT_DAILY_NEW_TARGET)
+    );
+    savePlan();
+    const assigned = assignTodayWords(state.plan.dailyNewTarget);
+    state.settings.todayOnly = true;
+    saveSettings();
+    updateScreen();
+    els.planStatus.textContent = assigned
+      ? `已生成今日词 ${assigned} 个，播放器已切到“今日词”。`
+      : "没有可分配的新词了。可以继续导入新词，或切到“全部词”复习。";
+  });
+
+  els.todayListenBtn.addEventListener("click", () => {
+    state.settings.todayOnly = true;
+    state.index = 0;
+    saveSettings();
+    updateScreen();
+    els.planStatus.textContent = "播放器已切到“今日词”。";
   });
 
   els.voiceSelect.addEventListener("change", () => {

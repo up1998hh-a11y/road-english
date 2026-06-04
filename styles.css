@@ -389,9 +389,24 @@ h2 {
   font-weight: 850;
 }
 
+.plan-actions button {
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  color: var(--text);
+  font-weight: 850;
+}
+
+.plan-actions button.active-scope {
+  border-color: rgba(13, 118, 110, 0.35);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 

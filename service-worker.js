@@ -1,5 +1,13 @@
-const CACHE_NAME = "drive-english-cache-v45";
-const APP_FILES = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.json", "./icon.svg"];
+const CACHE_NAME = "drive-english-cache-v46";
+const APP_FILES = [
+  "./",
+  "./index.html",
+  "./styles.css",
+  "./learning-core.js",
+  "./app.js",
+  "./manifest.json",
+  "./icon.svg",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

@@ -7,7 +7,7 @@
     <title>路上英语</title>
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="manifest.json" />
-    <link rel="stylesheet" href="styles.css?v=fit-long-words-2" />
+    <link rel="stylesheet" href="styles.css?v=daily-pool-1" />
   </head>
   <body>
     <div class="app">
@@ -58,6 +58,7 @@
             <button id="repeatBtn" type="button">重复 2 次</button>
             <button id="loopCurrentBtn" type="button">循环本词</button>
             <button id="hardModeBtn" type="button">暂无难词</button>
+            <button id="todayModeBtn" type="button">今日词</button>
             <button id="shuffleBtn" type="button">列表循环</button>
             <button id="shadowBtn" type="button">跟读关闭</button>
           </div>
@@ -139,7 +140,15 @@
                 <span>目标熟悉数</span>
                 <input id="planTargetInput" type="number" min="1" step="1" inputmode="numeric" placeholder="例如 30" />
               </label>
+              <label>
+                <span>今日新词数</span>
+                <input id="dailyNewInput" type="number" min="1" step="1" inputmode="numeric" placeholder="例如 15" />
+              </label>
               <button id="savePlanBtn" type="button">保存计划</button>
+            </div>
+            <div class="split-actions plan-actions">
+              <button id="assignTodayBtn" type="button">生成今日词</button>
+              <button id="todayListenBtn" type="button">只听今日词</button>
             </div>
             <div class="progress-track" aria-hidden="true">
               <div class="progress-bar" id="planProgressBar"></div>
@@ -148,6 +157,14 @@
               <article>
                 <span>词库</span>
                 <strong id="statTotal">0</strong>
+              </article>
+              <article>
+                <span>今日词</span>
+                <strong id="statToday">0</strong>
+              </article>
+              <article>
+                <span>未分配</span>
+                <strong id="statUnassigned">0</strong>
               </article>
               <article>
                 <span>已熟悉</span>
@@ -269,6 +286,7 @@
       </article>
     </template>
 
-    <script src="app.js?v=voice-note-1" defer></script>
+    <script src="learning-core.js?v=daily-pool-1"></script>
+    <script src="app.js?v=daily-pool-1" defer></script>
   </body>
 </html>
