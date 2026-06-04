@@ -789,29 +789,30 @@ function updateScreen() {
   termCard.classList.toggle("known-current", Boolean(word?.known));
   termCard.classList.toggle("hard-current", Boolean(word?.hard));
   termCard.classList.toggle("long-term", Boolean(word && getDisplayTerm(word).length > 8));
+  termCard.classList.toggle("empty-current", !word);
   els.familiarBtn.classList.toggle("active-known", Boolean(word?.known));
   els.hardBtn.classList.toggle("active-hard", Boolean(word?.hard));
   els.loopCurrentBtn.classList.toggle("active-loop", Boolean(state.settings.loopCurrent));
   els.hardModeBtn.classList.toggle("active-hard", Boolean(state.settings.hardOnly));
-  els.todayModeBtn.classList.toggle("active-loop", Boolean(state.settings.todayOnly));
+  els.todayModeBtn.classList.toggle("active-scope", Boolean(state.settings.todayOnly));
 
   if (!word) {
     els.termMeta.textContent = total ? "没有待播放词条" : "未开始";
     els.currentTerm.textContent = total
       ? state.settings.todayOnly
-        ? "先生成今日词"
+        ? "准备今日词"
         : state.settings.hardOnly
           ? "还没有难词"
-          : "都熟悉了"
-      : "先添加单词";
+          : "没有待播放词"
+      : "添加第一个词";
     els.currentPhonetic.textContent = "";
     els.currentMeaning.textContent = total
       ? state.settings.todayOnly
-        ? "到“计划”里点生成今日词，开车时就只听今天这批。"
+        ? "到计划里生成今天的学习池。"
         : state.settings.hardOnly
         ? "把不会的词标记为难词，就可以在这里循环听。"
         : "关闭“跳过熟悉词”可以继续复习。"
-      : "添加后可以一键循环听。";
+      : "添加后就能开始听。";
     els.currentSentence.textContent = "";
     els.progressBar.style.width = "0%";
   } else {

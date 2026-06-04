@@ -1,17 +1,17 @@
 :root {
   color-scheme: light;
-  --bg: #f7f4ef;
-  --surface: #fffefa;
+  --bg: #f4f2ed;
+  --surface: #fffdf8;
   --surface-strong: #ffffff;
   --text: #20242a;
-  --muted: #68707a;
-  --line: #dfd8cf;
-  --accent: #0d766e;
+  --muted: #6f7680;
+  --line: #ded8cf;
+  --accent: #0b766f;
   --accent-strong: #075e58;
-  --accent-soft: #dff3ef;
+  --accent-soft: #dcefeb;
   --coral: #e9684a;
-  --gold: #d49a2a;
-  --shadow: 0 18px 45px rgba(70, 61, 47, 0.12);
+  --gold: #c79836;
+  --shadow: 0 18px 38px rgba(55, 48, 38, 0.11);
   --radius: 8px;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -36,8 +36,8 @@ body {
   margin: 0;
   overflow-x: hidden;
   background:
-    linear-gradient(140deg, rgba(13, 118, 110, 0.08), transparent 34%),
-    linear-gradient(315deg, rgba(212, 154, 42, 0.12), transparent 35%),
+    radial-gradient(circle at 18% 0%, rgba(11, 118, 111, 0.09), transparent 28%),
+    linear-gradient(180deg, rgba(255, 253, 248, 0.86), rgba(244, 242, 237, 0.96)),
     var(--bg);
   color: var(--text);
 }
@@ -55,6 +55,14 @@ button {
   touch-action: manipulation;
 }
 
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(11, 118, 111, 0.18);
+  outline-offset: 2px;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -64,7 +72,7 @@ button:disabled {
   width: min(100%, 560px);
   min-height: 100svh;
   margin: 0 auto;
-  padding: max(12px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  padding: max(10px, env(safe-area-inset-top)) 14px max(22px, env(safe-area-inset-bottom));
 }
 
 .topbar {
@@ -72,7 +80,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 0 2px 8px;
+  padding: 0 2px 7px;
 }
 
 .section-label,
@@ -88,7 +96,7 @@ button:disabled {
 h1 {
   margin: 0;
   color: var(--muted);
-  font-size: clamp(1rem, 4vw, 1.2rem);
+  font-size: clamp(0.92rem, 3.5vw, 1.05rem);
   line-height: 1.1;
   letter-spacing: 0;
 }
@@ -113,15 +121,15 @@ h2 {
 }
 
 .panel {
-  border: 1px solid rgba(32, 36, 42, 0.09);
+  border: 1px solid rgba(32, 36, 42, 0.08);
   border-radius: var(--radius);
-  background: rgba(255, 254, 250, 0.86);
+  background: rgba(255, 253, 248, 0.9);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
 }
 
 .player-panel {
-  padding: 16px;
+  padding: 17px 16px 16px;
 }
 
 .player-head,
@@ -137,33 +145,36 @@ h2 {
 .subtle {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.92rem;
+  font-weight: 640;
 }
 
 .pill {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 0 12px;
   border-radius: 999px;
-  background: var(--accent-soft);
+  background: #dcefeb;
   color: var(--accent-strong);
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.84rem;
+  font-weight: 780;
   white-space: nowrap;
 }
 
 .term-card {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
-  min-height: 260px;
-  margin: 16px 0 14px;
-  padding: 22px 18px 18px;
-  border: 1px solid var(--line);
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  min-height: clamp(228px, 52svh, 288px);
+  margin: 14px 0 13px;
+  padding: 20px 18px 18px;
+  overflow: hidden;
+  border: 1px solid rgba(50, 45, 38, 0.13);
   border-radius: var(--radius);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 247, 240, 0.96)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(252, 250, 245, 0.96)),
     var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .term-card.known-current {
@@ -193,27 +204,59 @@ h2 {
 }
 
 #currentTerm {
-  align-self: end;
-  overflow: visible;
+  align-self: center;
+  overflow: hidden;
   overflow-wrap: normal;
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   max-width: 100%;
-  font-size: clamp(2.95rem, 15.5vw, 5.15rem);
+  font-size: clamp(2.6rem, 13.2vw, 4.75rem);
   font-weight: 900;
-  line-height: 0.96;
+  line-height: 1;
   letter-spacing: 0;
   white-space: nowrap;
+  text-overflow: clip;
 }
 
 .term-card.long-term #currentTerm {
-  font-size: clamp(2.45rem, 12.8vw, 4.2rem);
+  font-size: clamp(2.15rem, 10.8vw, 3.8rem);
+}
+
+.term-card.empty-current {
+  min-height: 230px;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(247, 245, 239, 0.96)),
+    var(--surface);
+}
+
+.term-card.empty-current #currentTerm {
+  align-self: end;
+  max-width: 14em;
+  margin-top: 24px;
+  color: var(--text);
+  font-size: clamp(1.95rem, 8.6vw, 2.75rem) !important;
+  font-weight: 860;
+  line-height: 1.08;
+  white-space: normal;
+}
+
+.term-card.empty-current .term-meta {
+  color: #747b84;
+}
+
+.term-card.empty-current .meaning {
+  max-width: 16em;
+  margin-top: 18px;
+  color: var(--accent-strong);
+  font-size: clamp(1.05rem, 4.4vw, 1.28rem);
+  font-weight: 760;
+  line-height: 1.32;
 }
 
 .phonetic {
   min-height: 28px;
-  margin: 14px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
-  font-size: clamp(1.2rem, 5.2vw, 1.45rem);
+  font-size: clamp(1.05rem, 4.6vw, 1.32rem);
   font-weight: 750;
   line-height: 1.3;
 }
@@ -222,14 +265,14 @@ h2 {
   align-self: end;
   width: fit-content;
   max-width: 100%;
-  margin: 22px 0 0;
+  margin: 18px 0 0;
   padding: 0;
   border-radius: 0;
   background: transparent;
   color: var(--accent-strong);
-  font-size: clamp(1.25rem, 5.2vw, 1.55rem);
-  font-weight: 850;
-  line-height: 1.2;
+  font-size: clamp(1.16rem, 4.7vw, 1.42rem);
+  font-weight: 820;
+  line-height: 1.24;
 }
 
 .sentence {
@@ -252,7 +295,7 @@ h2 {
 }
 
 .progress-track {
-  height: 7px;
+  height: 6px;
   overflow: hidden;
   border-radius: 999px;
   background: #e8e1d8;
@@ -268,32 +311,34 @@ h2 {
 
 .transport {
   display: grid;
-  grid-template-columns: 60px 1fr 60px;
-  gap: 12px;
-  margin-top: 16px;
+  grid-template-columns: 56px 1fr 56px;
+  gap: 11px;
+  margin-top: 14px;
 }
 
 .round-button {
-  min-height: 64px;
-  font-size: 2rem;
+  min-height: 60px;
+  color: #20242a;
+  font-size: 1.9rem;
+  box-shadow: 0 7px 18px rgba(55, 48, 38, 0.07);
 }
 
 .play-button {
   display: inline-grid;
   place-items: center;
-  min-height: 64px;
+  min-height: 60px;
   border-radius: var(--radius);
   background: var(--accent);
   color: white;
   font-size: 1.8rem;
   font-weight: 800;
-  box-shadow: 0 15px 30px rgba(13, 118, 110, 0.24);
+  box-shadow: 0 16px 28px rgba(11, 118, 111, 0.24);
 }
 
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 9px;
   margin-top: 10px;
 }
 
@@ -302,14 +347,15 @@ h2 {
 .text-button,
 .file-button {
   min-width: 0;
-  min-height: 44px;
+  min-height: 46px;
   padding: 0 10px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(50, 45, 38, 0.13);
   border-radius: var(--radius);
   background: var(--surface-strong);
   color: var(--text);
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-size: 0.91rem;
+  font-weight: 760;
+  box-shadow: 0 6px 16px rgba(55, 48, 38, 0.055);
 }
 
 .quick-actions button.active-known {
@@ -328,6 +374,12 @@ h2 {
   border-color: rgba(212, 154, 42, 0.42);
   background: #fff4d8;
   color: #7a5310;
+}
+
+.quick-actions button.active-scope {
+  border-color: rgba(11, 118, 111, 0.28);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .tabs {
@@ -560,6 +612,7 @@ textarea:focus,
 select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(13, 118, 110, 0.14);
+  outline: none;
 }
 
 .form-note {
@@ -823,6 +876,56 @@ input[type="range"] {
   border-radius: var(--radius);
   color: var(--muted);
   text-align: center;
+}
+
+@media (max-width: 420px) {
+  .app {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .player-panel {
+    padding: 15px 14px;
+  }
+
+  .term-card {
+    min-height: 216px;
+    padding: 18px 16px 16px;
+  }
+
+  #currentTerm {
+    font-size: clamp(2.25rem, 12.5vw, 3.6rem);
+  }
+
+  .term-card.empty-current #currentTerm {
+    font-size: clamp(1.72rem, 8vw, 2.18rem) !important;
+  }
+
+  .term-card.empty-current .meaning {
+    font-size: 1.04rem;
+  }
+
+  .transport {
+    grid-template-columns: 52px 1fr 52px;
+    gap: 9px;
+  }
+
+  .round-button,
+  .play-button {
+    min-height: 56px;
+  }
+
+  .quick-actions {
+    gap: 8px;
+  }
+
+  .quick-actions button,
+  .split-actions button,
+  .text-button,
+  .file-button {
+    min-height: 44px;
+    font-size: 0.88rem;
+  }
 }
 
 @media (min-width: 720px) {
