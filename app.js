@@ -151,6 +151,41 @@ const basicTranslations = {
   meaning: "意思；含义",
 };
 
+const studyTranslations = {
+  address: "n. 地址；演讲 / v. 处理；称呼；发表演讲",
+  answer: "n. 答案；回应 / v. 回答；回应；解决",
+  case: "n. 情况；案例；箱子；语法格",
+  charge: "n. 费用；指控；电量 / v. 收费；指控；充电；冲锋",
+  command: "n. 命令；指令；控制权 / v. 命令；指挥；掌握",
+  lead: "v. 领导；引导；通向 / n. 线索；领先；铅",
+  operate: "v. 操作；运转；经营 / adj. 可操作的",
+  order: "n. 顺序；订单；命令 / v. 命令；订购；整理",
+  receive: "v. 收到；接收；接待；承受",
+  record: "n. 记录；唱片；履历 / v. 记录；录音；录像",
+  present: "adj. 现在的；出席的 / v. 提出；展示；赠送 / n. 礼物；现在",
+  object: "n. 物体；目标；宾语 / v. 反对",
+  position: "n. 位置；职位；立场 / v. 放置；定位",
+  project: "n. 项目；计划 / v. 预测；投射；展示",
+  subject: "n. 主题；科目；主语 / adj. 受制于；易遭受的 / v. 使经受",
+  support: "v. 支持；支撑；供养 / n. 支持；支撑物",
+  control: "n. 控制；管理；操纵 / v. 控制；管理；限制",
+  access: "n. 入口；使用权；访问权限 / v. 访问；使用；进入",
+  review: "n. 复习；评论；审查 / v. 复习；评论；审查",
+  produce: "v. 生产；产生；拿出 / n. 农产品",
+  manage: "v. 管理；设法做到；应付",
+  input: "n. 输入；投入；意见 / v. 输入",
+  output: "n. 输出；产量；作品 / v. 输出",
+  method: "n. 方法；条理；规律",
+  process: "n. 过程；流程；工序 / v. 处理；加工",
+  issue: "n. 问题；期号；发行 / v. 发布；发行；发给",
+  run: "v. 跑；运行；经营 / n. 跑步；运行；一段时间",
+  set: "v. 设置；放置；确定 / n. 一套；集合 / adj. 固定的",
+  state: "n. 状态；州；国家 / v. 陈述；说明",
+  result: "n. 结果；成绩 / v. 导致；产生结果",
+  efficient: "adj. 高效的；有效率的",
+  significantly: "adv. 显著地；明显地；意味深长地",
+};
+
 const chineseToEnglish = {
   好的: "good",
   优秀的: "good",
@@ -722,15 +757,22 @@ function cleanMeaningText(value) {
   const text = String(value || "").trim();
   if (!text) return "";
   const normalized = text.replace(/\s+/g, " ");
+  if (hasChineseText(normalized)) {
+    return normalized.split(/\s+/).find(Boolean) || normalized;
+  }
   const primary = normalized
     .split(/[;；|/、，,\n]/)
     .map((item) => item.trim())
     .find((item) => item && !/^[-–—]$/.test(item));
   if (primary && primary !== normalized) return primary;
-  if (hasChineseText(normalized)) {
-    return normalized.split(/\s+/).find(Boolean) || normalized;
-  }
   return primary || normalized;
+}
+
+function normalizeMeaningForCompare(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[a-z.]/g, "")
+    .replace(/[；;、，,|/\s]+/g, "");
 }
 
 function getPhoneticLookupTerm(value) {
@@ -758,7 +800,18 @@ function getEmbeddedMeaning(word) {
 }
 
 function getDisplayMeaning(word) {
-  return cleanMeaningText(word?.meaning) || getEmbeddedMeaning(word);
+  const term = getDisplayTerm(word).toLowerCase();
+  const customMeaning = cleanMeaningText(word?.meaning);
+  const richerMeaning = studyTranslations[term] || "";
+  if (!customMeaning) return richerMeaning || getEmbeddedMeaning(word);
+  if (
+    richerMeaning &&
+    normalizeMeaningForCompare(customMeaning).length <= 4 &&
+    normalizeMeaningForCompare(richerMeaning).includes(normalizeMeaningForCompare(customMeaning))
+  ) {
+    return richerMeaning;
+  }
+  return customMeaning;
 }
 
 function fitCurrentTerm() {
@@ -861,8 +914,8 @@ function updateScreen() {
     els.termMeta.textContent = `${position} / ${playable.length}`;
     els.currentTerm.textContent = displayTerm;
     els.currentPhonetic.textContent = phoneticText;
-    els.currentMeaning.textContent =
-      displayMeaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义");
+    const meaningText = displayMeaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义");
+    els.currentMeaning.innerHTML = formatMeaningHtml(meaningText);
     els.currentSentence.textContent = word.sentence || "";
     els.familiarBtn.textContent = word.known ? "取消熟悉" : "标记熟悉";
     els.hardBtn.textContent = word.hard ? "取消难词" : "标记难词";
@@ -1055,10 +1108,22 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+function formatMeaningHtml(value) {
+  return escapeHtml(value).replace(/\s+\/\s+/g, "<br>");
+}
+
 async function autoTranslateWord(word) {
   if (!word || word.meaning || getEmbeddedMeaning(word) || state.translatingIds.has(word.id)) return;
   const term = getDisplayTerm(word);
   const cacheKey = term.toLowerCase();
+  if (studyTranslations[cacheKey]) {
+    word.meaning = studyTranslations[cacheKey];
+    state.wordListDirty = true;
+    saveWords();
+    updateScreen();
+    return;
+  }
+
   if (basicTranslations[cacheKey]) {
     word.meaning = cleanMeaningText(basicTranslations[cacheKey]);
     state.wordListDirty = true;
