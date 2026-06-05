@@ -205,13 +205,14 @@ h2 {
 
 #currentTerm {
   align-self: center;
-  overflow: hidden;
+  overflow: visible;
   overflow-wrap: normal;
-  margin: 10px 0 0;
+  margin: 8px 0 0;
+  padding-bottom: 0.08em;
   max-width: 100%;
   font-size: clamp(2.6rem, 13.2vw, 4.75rem);
   font-weight: 900;
-  line-height: 1;
+  line-height: 1.1;
   letter-spacing: 0;
   white-space: nowrap;
   text-overflow: clip;
