@@ -24,4 +24,14 @@ describe("player typography", () => {
     assert.notEqual(getCssValue(block, "overflow"), "hidden");
     assert.ok(Number(getCssValue(block, "line-height")) >= 1.08);
   });
+
+  it("keeps switch inputs inside the visible switch control", () => {
+    const switchBlock = getCssBlock(".switch");
+    const inputBlock = getCssBlock(".switch input");
+
+    assert.equal(getCssValue(switchBlock, "position"), "relative");
+    assert.equal(getCssValue(switchBlock, "overflow"), "hidden");
+    assert.equal(getCssValue(inputBlock, "inset"), "0");
+    assert.equal(getCssValue(inputBlock, "width"), "100%");
+  });
 });

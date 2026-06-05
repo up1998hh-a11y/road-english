@@ -98,6 +98,12 @@ function getDailyAssignableWords(words) {
   return words.filter((word) => word && !word.known && !normalizeAssignedDate(word.assignedDate));
 }
 
+function prepareQuickAddedWord(word, date = todayIsoDate()) {
+  if (!word) return null;
+  word.assignedDate = getCurrentStudyDate(date);
+  return word;
+}
+
 function getPlayableWordsForSettings(words, settings = {}) {
   const currentDate = getCurrentStudyDate(settings.currentDate);
   return words.filter((word) => {
@@ -115,6 +121,7 @@ global.RoadEnglishCore = {
   getPlayableWordsForSettings,
   getTodayWords,
   normalizeAssignedDate,
+  prepareQuickAddedWord,
   parseBulkText,
 };
 

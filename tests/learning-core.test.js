@@ -10,6 +10,7 @@ vm.runInContext(fs.readFileSync(new URL("../learning-core.js", import.meta.url),
 const {
   getDailyAssignableWords,
   getPlayableWordsForSettings,
+  prepareQuickAddedWord,
   parseBulkText,
 } = context.RoadEnglishCore;
 
@@ -36,6 +37,14 @@ describe("bulk import parsing", () => {
 });
 
 describe("daily learning pool", () => {
+  it("puts a single quick-added word into today's learning pool", () => {
+    const word = { id: "a", term: "command", known: false, assignedDate: "" };
+
+    prepareQuickAddedWord(word, "2026-06-04");
+
+    assert.equal(word.assignedDate, "2026-06-04");
+  });
+
   it("assigns only unassigned unfamiliar words", () => {
     const words = [
       { id: "a", term: "necessary", known: false, assignedDate: "" },

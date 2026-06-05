@@ -1,4 +1,4 @@
-const CACHE_NAME = "drive-english-cache-v54";
+const CACHE_NAME = "drive-english-cache-v56";
 const APP_FILES = [
   "./",
   "./index.html",

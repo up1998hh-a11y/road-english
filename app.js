@@ -65,6 +65,11 @@ function createRoadEnglishCore() {
     DEFAULT_DAILY_NEW_TARGET: defaultDailyNewTarget,
     getCurrentStudyDate,
     getDailyAssignableWords: (words) => words.filter((word) => word && !word.known && !normalizeAssignedDate(word.assignedDate)),
+    prepareQuickAddedWord: (word, date = todayIsoDate()) => {
+      if (!word) return null;
+      word.assignedDate = getCurrentStudyDate(date);
+      return word;
+    },
     getPlayableWordsForSettings: (words, settings = {}) => {
       const currentDate = getCurrentStudyDate(settings.currentDate);
       return words.filter((word) => {
@@ -92,6 +97,7 @@ const {
   getPlayableWordsForSettings,
   getTodayWords,
   normalizeAssignedDate,
+  prepareQuickAddedWord,
   parseBulkText: parseBulkRows,
 } = globalThis.RoadEnglishCore;
 
@@ -1937,18 +1943,22 @@ function bindEvents() {
         meaning,
         sentence: els.sentenceInput.value,
       });
+      prepareQuickAddedWord(word, getCurrentStudyDate(state.plan.date));
       const result = addWords([word]);
       if (result.added) {
+        state.index = getPlayableWords().findIndex((item) => item.id === word.id);
+        if (state.index < 0) state.index = 0;
         els.singleForm.reset();
         setMoreFields(false);
         els.termInput.focus();
         setSingleStatus(
           result.saved
-            ? `已保存：${word.term}`
-            : `已加入：${word.term}。当前打开方式不适合长期保存，建议发布成网页 App 后使用。`
+            ? `已加入今日词：${word.term}`
+            : `已加入今日词：${word.term}。当前打开方式不适合长期保存，建议发布成网页 App 后使用。`
         );
         setBulkStatus("");
-        switchTab("library");
+        switchTab("add");
+        updateScreen();
       } else {
         setSingleStatus(`“${word.term}”已经在词库里了。`);
       }
