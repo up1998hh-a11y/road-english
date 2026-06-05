@@ -442,11 +442,14 @@ h2 {
 }
 
 .plan-actions button {
+  flex: 1 1 0;
   min-height: 46px;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-strong);
   color: var(--text);
+  font-size: 0.9rem;
   font-weight: 850;
 }
 
@@ -454,6 +457,12 @@ h2 {
   border-color: rgba(13, 118, 110, 0.35);
   background: var(--accent-soft);
   color: var(--accent-strong);
+}
+
+.plan-actions button.active-hard {
+  border-color: rgba(233, 104, 74, 0.32);
+  background: #fff0e9;
+  color: #a9361f;
 }
 
 .stats-grid {

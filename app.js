@@ -391,6 +391,7 @@ const els = {
   savePlanBtn: $("#savePlanBtn"),
   assignTodayBtn: $("#assignTodayBtn"),
   todayListenBtn: $("#todayListenBtn"),
+  todayHardBtn: $("#todayHardBtn"),
   planProgressBar: $("#planProgressBar"),
   statTotal: $("#statTotal"),
   statToday: $("#statToday"),
@@ -1006,6 +1007,10 @@ function updatePlanPanel() {
   els.statHard.textContent = hard;
   els.todayListenBtn.textContent = state.settings.todayOnly ? "正在听今日词" : "只听今日词";
   els.todayListenBtn.classList.toggle("active-scope", Boolean(state.settings.todayOnly));
+  const todayHardCount = todayWords.filter((word) => word.hard).length;
+  els.todayHardBtn.textContent = todayHardCount ? `今日难词 ${todayHardCount}` : "今日难词";
+  els.todayHardBtn.disabled = !todayHardCount && !(state.settings.todayOnly && state.settings.hardOnly);
+  els.todayHardBtn.classList.toggle("active-hard", Boolean(state.settings.todayOnly && state.settings.hardOnly));
   els.hardListCount.textContent = `${hard} 个`;
   els.knownListCount.textContent = `${known} 个`;
   renderMiniWordList(els.hardFocusList, hardWords, "还没有难词。遇到卡住的词，点“标记难词”。");
@@ -1960,10 +1965,20 @@ function bindEvents() {
 
   els.todayListenBtn.addEventListener("click", () => {
     state.settings.todayOnly = true;
+    state.settings.hardOnly = false;
     state.index = 0;
     saveSettings();
     updateScreen();
     els.planStatus.textContent = "播放器已切到“今日词”。";
+  });
+
+  els.todayHardBtn.addEventListener("click", () => {
+    state.settings.todayOnly = true;
+    state.settings.hardOnly = true;
+    state.index = 0;
+    saveSettings();
+    updateScreen();
+    els.planStatus.textContent = "播放器已切到“今日难词”。";
   });
 
   els.voiceSelect.addEventListener("change", () => {

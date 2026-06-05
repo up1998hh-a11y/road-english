@@ -71,4 +71,24 @@ describe("daily learning pool", () => {
       ["a"]
     );
   });
+
+  it("can limit playback to today's hard words", () => {
+    const words = [
+      { id: "a", term: "necessary", known: false, hard: true, assignedDate: "2026-06-04" },
+      { id: "b", term: "commute", known: false, hard: false, assignedDate: "2026-06-04" },
+      { id: "c", term: "recognize", known: false, hard: true, assignedDate: "2026-06-03" },
+    ];
+
+    const playable = getPlayableWordsForSettings(words, {
+      todayOnly: true,
+      currentDate: "2026-06-04",
+      hardOnly: true,
+      skipKnown: false,
+    });
+
+    assert.deepEqual(
+      JSON.parse(JSON.stringify(playable.map((word) => word.id))),
+      ["a"]
+    );
+  });
 });
