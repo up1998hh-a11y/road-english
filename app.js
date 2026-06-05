@@ -229,8 +229,8 @@ const basicPhonetics = {
 
 const britishStyleVoiceLangs = ["en-gb", "en-ie", "en-au", "en-nz", "en-za"];
 const americanStyleVoiceLangs = ["en-us", "en-ca"];
-const preferredEnglishVoiceLangs = ["en-gb", "en-us", "en-ca", "en-ie", "en-au", "en-nz", "en-za"];
-const VOICE_LIMIT = 18;
+const preferredEnglishVoiceLangs = ["en-us", "en-gb", "en-au", "en-ie", "en-ca", "en-nz", "en-za", "en-in"];
+const VOICE_LIMIT = 40;
 const highQualityVoicePatterns = [
   /enhanced/i,
   /premium/i,
@@ -240,17 +240,45 @@ const highQualityVoicePatterns = [
   /优化音质/i,
   /精品/i,
   /alex/i,
+  /aaron/i,
   /allison/i,
+  /arthur/i,
   /ava/i,
+  /catherine/i,
+  /daniel/i,
+  /eddy/i,
+  /fiona/i,
   /joelle/i,
   /joey/i,
+  /jamie/i,
+  /karen/i,
+  /kate/i,
   /kendra/i,
   /kimberly/i,
+  /kathy/i,
+  /lee/i,
+  /malcolm/i,
+  /martha/i,
   /matthew/i,
+  /matilda/i,
+  /melina/i,
+  /moira/i,
+  /nathan/i,
   /nicky/i,
+  /noelle/i,
+  /olivia/i,
+  /oliver/i,
+  /quinn/i,
+  /rishi/i,
+  /russell/i,
   /samantha/i,
+  /serena/i,
+  /stephanie/i,
   /susan/i,
+  /tessa/i,
   /tom/i,
+  /veena/i,
+  /victoria/i,
   /zoe/i,
 ];
 const roboticVoicePatterns = [
@@ -267,6 +295,7 @@ const roboticVoicePatterns = [
   /bells/i,
   /organ/i,
   /jester/i,
+  /princess/i,
   /superstar/i,
   /bad news/i,
   /good news/i,
@@ -1448,9 +1477,11 @@ function getVoiceQualityRank(voice) {
 
 function getLearnerVoiceRank(voice) {
   const name = voice.name.toLowerCase();
-  if (/samantha|ava|allison|susan|kendra|kimberly|nicky|joelle|zoe|fiona|daniel|alex|matthew|tom/.test(name)) return 0;
-  if (/moira|karen|tessa|rishi|serena|arthur|martha|oliver/.test(name)) return 1;
-  return 2;
+  if (/samantha|alex|ava|allison|susan|tom|kathy|nicky|joelle|kendra|kimberly|zoe|matthew|noelle|stephanie|jamie/.test(name)) return 0;
+  if (/daniel|fiona|serena|oliver|martha|arthur|moira|karen|tessa|lee|catherine|malcolm|kate|olivia|russell/.test(name)) return 1;
+  if (/victoria|melina|aaron|shelley|gordon|eddy|quinn|nathan|matilda|rishi|veena/.test(name)) return 2;
+  if (/rocko|sandy|reed|flo|grandma|grandpa/.test(name)) return 3;
+  return 3;
 }
 
 function sortVoices(voices) {
@@ -1477,12 +1508,12 @@ function pickVoicesByAccent(voices) {
   const nearBritish = voices.filter((voice) => hasBritishStyleAccent(voice) && !hasCoreBritishAccent(voice));
   const selected = [];
 
-  addVoiceGroup(selected, american.filter((voice) => getVoiceQualityRank(voice) === 0), 4);
-  addVoiceGroup(selected, british.filter((voice) => getVoiceQualityRank(voice) === 0), 8);
-  addVoiceGroup(selected, other.filter((voice) => getVoiceQualityRank(voice) === 0), 12);
-  addVoiceGroup(selected, american, 14);
-  addVoiceGroup(selected, british, 16);
-  addVoiceGroup(selected, nearBritish, 17);
+  addVoiceGroup(selected, american.filter((voice) => getVoiceQualityRank(voice) === 0), 14);
+  addVoiceGroup(selected, british.filter((voice) => getVoiceQualityRank(voice) === 0), 24);
+  addVoiceGroup(selected, nearBritish.filter((voice) => getVoiceQualityRank(voice) === 0), 30);
+  addVoiceGroup(selected, other.filter((voice) => getVoiceQualityRank(voice) === 0), 34);
+  addVoiceGroup(selected, american, 36);
+  addVoiceGroup(selected, british, 38);
   addVoiceGroup(selected, other, VOICE_LIMIT);
   addVoiceGroup(selected, voices, VOICE_LIMIT);
 
@@ -1738,7 +1769,7 @@ function renderVoices() {
     els.voiceSelect.append(option);
   });
 
-  els.voiceNote.textContent = `当前手机提供 ${state.voices.length} 个可用英文声音。想更多：iPhone 设置 -> 辅助功能 -> 朗读内容 -> 声音 -> 英语，下载更多声音后再打开本页。`;
+  els.voiceNote.textContent = `已筛选 ${state.voices.length} 个主流英文声音。更多选择取决于手机已安装声音：iPhone 设置 -> 辅助功能 -> 朗读内容 -> 声音 -> 英语。`;
 }
 
 function bindEvents() {
