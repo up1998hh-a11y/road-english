@@ -24,6 +24,24 @@ function createRoadEnglishCore() {
     return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
   };
   const getCurrentStudyDate = (planDate = "") => normalizeAssignedDate(planDate) || todayIsoDate();
+  const getTodayWords = (words, date = todayIsoDate()) => {
+    const currentDate = getCurrentStudyDate(date);
+    return words.filter((word) => normalizeAssignedDate(word?.assignedDate) === currentDate);
+  };
+  const getDailyPlanStats = (words, plan = {}) => {
+    const currentDate = getCurrentStudyDate(plan.date);
+    const todayWords = getTodayWords(words, currentDate);
+    const todayKnown = todayWords.filter((word) => word.known).length;
+    const familiarTarget = Math.max(1, Math.round(Number(plan.target) || 1));
+    return {
+      currentDate,
+      familiarTarget,
+      todayWords,
+      todayKnown,
+      todayRemaining: Math.max(0, familiarTarget - todayKnown),
+      rate: Math.min(100, Math.round((todayKnown / familiarTarget) * 100)),
+    };
+  };
   const splitMeaningFromLine = (line) => {
     const text = stripListMarker(line);
     const chineseIndex = text.search(chineseRe);
@@ -79,10 +97,8 @@ function createRoadEnglishCore() {
         return true;
       });
     },
-    getTodayWords: (words, date = todayIsoDate()) => {
-      const currentDate = getCurrentStudyDate(date);
-      return words.filter((word) => normalizeAssignedDate(word?.assignedDate) === currentDate);
-    },
+    getDailyPlanStats,
+    getTodayWords,
     normalizeAssignedDate,
     parseBulkText,
   };
@@ -94,6 +110,7 @@ const {
   DEFAULT_DAILY_NEW_TARGET,
   getCurrentStudyDate,
   getDailyAssignableWords,
+  getDailyPlanStats,
   getPlayableWordsForSettings,
   getTodayWords,
   normalizeAssignedDate,
@@ -368,7 +385,7 @@ const defaultSettings = {
 
 const defaultPlan = {
   date: "",
-  target: 30,
+  target: 10,
   dailyNewTarget: DEFAULT_DAILY_NEW_TARGET,
 };
 
@@ -532,6 +549,7 @@ function loadPlan() {
       ...defaultPlan,
       ...JSON.parse(window.localStorage.getItem(PLAN_KEY) || "{}"),
     };
+    saved.target = Math.max(1, Math.round(Number(saved.target) || defaultPlan.target));
     saved.dailyNewTarget = Math.max(
       1,
       Math.round(Number(saved.dailyNewTarget) || DEFAULT_DAILY_NEW_TARGET)
@@ -1072,26 +1090,26 @@ function updatePlanPanel() {
   const knownWords = state.words.filter((word) => word.known);
   const hardWords = state.words.filter((word) => word.hard);
   const studyDate = getCurrentStudyDate(state.plan.date);
-  const todayWords = getTodayWords(state.words, studyDate);
+  const planStats = getDailyPlanStats(state.words, { ...state.plan, date: studyDate });
+  const todayWords = planStats.todayWords;
   const unassigned = getDailyAssignableWords(state.words).length;
   const known = knownWords.length;
   const hard = hardWords.length;
-  const learning = Math.max(0, total - known);
-  const target = Math.max(1, Number(state.plan.target) || defaultPlan.target);
+  const target = planStats.familiarTarget;
   const dailyNewTarget = Math.max(1, Number(state.plan.dailyNewTarget) || DEFAULT_DAILY_NEW_TARGET);
-  const rate = Math.min(100, Math.round((known / target) * 100));
+  const rate = planStats.rate;
 
   els.planDateInput.value = studyDate;
   els.planTargetInput.value = target;
   els.dailyNewInput.value = dailyNewTarget;
   els.planRate.textContent = `${rate}%`;
-  els.planSummary.textContent = `${getPlanDateLabel()} 今日 ${todayWords.length} 个词，未分配 ${unassigned} 个。总目标 ${target}，已熟悉 ${known}。`;
+  els.planSummary.textContent = `${getPlanDateLabel()} 今日词 ${todayWords.length} 个，当日目标熟悉 ${target} 个，已完成 ${planStats.todayKnown} 个，还差 ${planStats.todayRemaining} 个。未分配 ${unassigned} 个。`;
   els.planProgressBar.style.width = `${rate}%`;
   els.statTotal.textContent = total;
   els.statToday.textContent = todayWords.length;
   els.statUnassigned.textContent = unassigned;
-  els.statKnown.textContent = known;
-  els.statLearning.textContent = learning;
+  els.statKnown.textContent = planStats.todayKnown;
+  els.statLearning.textContent = planStats.todayRemaining;
   els.statHard.textContent = hard;
   els.todayListenBtn.textContent = state.settings.todayOnly ? "正在听今日词" : "只听今日词";
   els.todayListenBtn.classList.toggle("active-scope", Boolean(state.settings.todayOnly));
@@ -2049,7 +2067,9 @@ function bindEvents() {
     );
     const saved = savePlan();
     updatePlanPanel();
-    els.planStatus.textContent = saved ? "计划已保存。" : "计划没有保存成功，可以稍后再试。";
+    els.planStatus.textContent = saved
+      ? `今日计划已保存：熟悉 ${state.plan.target} 个，新学 ${state.plan.dailyNewTarget} 个。`
+      : "计划没有保存成功，可以稍后再试。";
   });
 
   els.assignTodayBtn.addEventListener("click", () => {

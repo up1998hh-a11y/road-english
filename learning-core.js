@@ -94,6 +94,21 @@ function getTodayWords(words, date = todayIsoDate()) {
   return words.filter((word) => normalizeAssignedDate(word?.assignedDate) === currentDate);
 }
 
+function getDailyPlanStats(words, plan = {}) {
+  const currentDate = getCurrentStudyDate(plan.date);
+  const todayWords = getTodayWords(words, currentDate);
+  const todayKnown = todayWords.filter((word) => word.known).length;
+  const familiarTarget = Math.max(1, Math.round(Number(plan.target) || 1));
+  return {
+    currentDate,
+    familiarTarget,
+    todayWords,
+    todayKnown,
+    todayRemaining: Math.max(0, familiarTarget - todayKnown),
+    rate: Math.min(100, Math.round((todayKnown / familiarTarget) * 100)),
+  };
+}
+
 function getDailyAssignableWords(words) {
   return words.filter((word) => word && !word.known && !normalizeAssignedDate(word.assignedDate));
 }
@@ -118,6 +133,7 @@ global.RoadEnglishCore = {
   DEFAULT_DAILY_NEW_TARGET,
   getCurrentStudyDate,
   getDailyAssignableWords,
+  getDailyPlanStats,
   getPlayableWordsForSettings,
   getTodayWords,
   normalizeAssignedDate,

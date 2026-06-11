@@ -9,6 +9,7 @@ vm.runInContext(fs.readFileSync(new URL("../learning-core.js", import.meta.url),
 
 const {
   getDailyAssignableWords,
+  getDailyPlanStats,
   getPlayableWordsForSettings,
   prepareQuickAddedWord,
   parseBulkText,
@@ -37,6 +38,24 @@ describe("bulk import parsing", () => {
 });
 
 describe("daily learning pool", () => {
+  it("calculates today's familiar target progress from today's words", () => {
+    const words = [
+      { id: "a", known: true, assignedDate: "2026-06-04" },
+      { id: "b", known: false, assignedDate: "2026-06-04" },
+      { id: "c", known: true, assignedDate: "2026-06-03" },
+    ];
+
+    const stats = getDailyPlanStats(words, { date: "2026-06-04", target: 2 });
+
+    assert.equal(stats.todayKnown, 1);
+    assert.equal(stats.todayRemaining, 1);
+    assert.equal(stats.rate, 50);
+    assert.deepEqual(
+      JSON.parse(JSON.stringify(stats.todayWords.map((word) => word.id))),
+      ["a", "b"]
+    );
+  });
+
   it("puts a single quick-added word into today's learning pool", () => {
     const word = { id: "a", term: "command", known: false, assignedDate: "" };
 

@@ -7,7 +7,7 @@
     <title>路上英语</title>
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="manifest.json" />
-    <link rel="stylesheet" href="styles.css?v=preflight-polish-1" />
+    <link rel="stylesheet" href="styles.css?v=daily-target-1" />
   </head>
   <body>
     <div class="app">
@@ -133,18 +133,18 @@
             </div>
             <div class="plan-form">
               <label>
-                <span>目标日期</span>
+                <span>学习日期</span>
                 <input id="planDateInput" type="date" />
               </label>
               <label>
-                <span>目标熟悉数</span>
-                <input id="planTargetInput" type="number" min="1" step="1" inputmode="numeric" placeholder="例如 30" />
+                <span>当日熟悉目标</span>
+                <input id="planTargetInput" type="number" min="1" step="1" inputmode="numeric" placeholder="例如 10" />
               </label>
               <label>
                 <span>今日新词数</span>
                 <input id="dailyNewInput" type="number" min="1" step="1" inputmode="numeric" placeholder="例如 15" />
               </label>
-              <button id="savePlanBtn" type="button">保存计划</button>
+              <button id="savePlanBtn" type="button">保存今日计划</button>
             </div>
             <div class="split-actions plan-actions">
               <button id="assignTodayBtn" type="button">生成今日词</button>
@@ -168,11 +168,11 @@
                 <strong id="statUnassigned">0</strong>
               </article>
               <article>
-                <span>已熟悉</span>
+                <span>今日已熟悉</span>
                 <strong id="statKnown">0</strong>
               </article>
               <article>
-                <span>未熟悉</span>
+                <span>今日待熟悉</span>
                 <strong id="statLearning">0</strong>
               </article>
               <article>
@@ -287,6 +287,6 @@
       </article>
     </template>
 
-    <script src="app.js?v=preflight-polish-1" defer></script>
+    <script src="app.js?v=daily-target-1" defer></script>
   </body>
 </html>
