@@ -7,7 +7,7 @@
     <title>路上英语</title>
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="manifest.json" />
-    <link rel="stylesheet" href="styles.css?v=daily-target-1" />
+    <link rel="stylesheet" href="styles.css?v=library-categories-1" />
   </head>
   <body>
     <div class="app">
@@ -86,6 +86,10 @@
                 <span>中文意思</span>
                 <input id="meaningInput" name="meaning" autocomplete="off" placeholder="可以不填，自动翻译" />
               </label>
+              <label>
+                <span>放入目录</span>
+                <select id="categoryInput" name="category"></select>
+              </label>
             </div>
             <div class="extra-fields" id="extraFields" hidden>
               <label>
@@ -109,6 +113,10 @@
               </div>
             </div>
             <div class="bulk-body" id="bulkBody" hidden>
+              <label>
+                <span>这批词放到</span>
+                <select id="bulkCategoryInput"></select>
+              </label>
               <textarea id="bulkInput" rows="7" placeholder="necessary | /ˈnesəseri/ | 必要的 | It is necessary to practice every day.&#10;good&#10;commute | 通勤 | I listen to English during my commute."></textarea>
               <div class="split-actions">
                 <button class="primary-action" id="bulkAddBtn" type="button">加入词库</button>
@@ -203,6 +211,13 @@
 
         <section class="tab-panel" id="libraryPanel" hidden>
           <section class="panel library-tools">
+            <div>
+              <div class="library-heading">
+                <h2>词库目录</h2>
+                <span id="libraryCategoryCount">0 个词</span>
+              </div>
+              <div class="category-tabs" id="categoryTabs" aria-label="词库目录"></div>
+            </div>
             <label>
               <span>搜索</span>
               <input id="searchInput" autocomplete="off" placeholder="输入英文或中文" />
@@ -287,6 +302,6 @@
       </article>
     </template>
 
-    <script src="app.js?v=daily-target-1" defer></script>
+    <script src="app.js?v=library-categories-1" defer></script>
   </body>
 </html>

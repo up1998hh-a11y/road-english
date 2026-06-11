@@ -151,6 +151,14 @@ const sampleWords = [
   },
 ];
 
+const defaultCategories = [
+  { id: "unassigned", label: "未分配" },
+  { id: "trade", label: "外贸词汇" },
+  { id: "daily", label: "日常词汇" },
+  { id: "ielts", label: "雅思词汇" },
+];
+const defaultCategoryId = "unassigned";
+
 const basicTranslations = {
   good: "好的；优秀的",
   bad: "坏的；糟糕的",
@@ -410,6 +418,7 @@ const state = {
   playbackToken: 0,
   lastInterruptAt: 0,
   waiters: new Set(),
+  libraryCategory: "all",
   wordListDirty: true,
 };
 
@@ -452,6 +461,7 @@ const els = {
   singleForm: $("#singleForm"),
   termInput: $("#termInput"),
   meaningInput: $("#meaningInput"),
+  categoryInput: $("#categoryInput"),
   sentenceInput: $("#sentenceInput"),
   moreFieldsBtn: $("#moreFieldsBtn"),
   extraFields: $("#extraFields"),
@@ -461,9 +471,12 @@ const els = {
   bulkToggleBtn: $("#bulkToggleBtn"),
   bulkBody: $("#bulkBody"),
   bulkInput: $("#bulkInput"),
+  bulkCategoryInput: $("#bulkCategoryInput"),
   bulkAddBtn: $("#bulkAddBtn"),
   bulkStatus: $("#bulkStatus"),
   fileInput: $("#fileInput"),
+  categoryTabs: $("#categoryTabs"),
+  libraryCategoryCount: $("#libraryCategoryCount"),
   searchInput: $("#searchInput"),
   exportBtn: $("#exportBtn"),
   clearDoneBtn: $("#clearDoneBtn"),
@@ -719,13 +732,36 @@ function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function createWord({ term, meaning = "", phonetic = "", sentence = "" }) {
+function normalizeCategory(value) {
+  const text = String(value || "").trim();
+  if (!text) return defaultCategoryId;
+  const matched = defaultCategories.find(
+    (category) => category.id === text || category.label === text
+  );
+  return matched ? matched.id : defaultCategoryId;
+}
+
+function getCategoryLabel(value) {
+  const id = normalizeCategory(value);
+  return defaultCategories.find((category) => category.id === id)?.label || "未分配";
+}
+
+function applyCategory(words, categoryId) {
+  const normalized = normalizeCategory(categoryId);
+  words.forEach((word) => {
+    if (word) word.category = normalized;
+  });
+  return words;
+}
+
+function createWord({ term, meaning = "", phonetic = "", sentence = "", category = defaultCategoryId }) {
   return {
     id: createId(),
     term: String(term || "").trim(),
     meaning: String(meaning || "").trim(),
     phonetic: String(phonetic || "").trim(),
     sentence: String(sentence || "").trim(),
+    category: normalizeCategory(category),
     known: false,
     hard: false,
     assignedDate: "",
@@ -747,6 +783,7 @@ function normalizeWord(raw) {
   });
   word.known = Boolean(raw.known);
   word.hard = Boolean(raw.hard);
+  word.category = normalizeCategory(raw.category || raw.library || raw.group);
   word.assignedDate = normalizeAssignedDate(raw.assignedDate);
   word.learnedAt = String(raw.learnedAt || "").trim();
   word.createdAt = String(raw.createdAt || word.createdAt);
@@ -961,6 +998,7 @@ function updateScreen() {
   els.skipKnownToggle.checked = state.settings.skipKnown;
   els.shadowToggle.checked = state.settings.shadowing;
   els.clearDoneBtn.textContent = state.settings.hideKnown ? "显示熟悉" : "隐藏熟悉";
+  updateCategoryControls();
 
   if (state.wordListDirty) {
     renderWordList();
@@ -968,21 +1006,65 @@ function updateScreen() {
   updatePlanPanel();
 }
 
+function getCategoryCounts() {
+  const counts = { all: state.words.length };
+  defaultCategories.forEach((category) => {
+    counts[category.id] = 0;
+  });
+  state.words.forEach((word) => {
+    const category = normalizeCategory(word.category);
+    counts[category] = (counts[category] || 0) + 1;
+  });
+  return counts;
+}
+
+function updateCategoryControls() {
+  renderCategoryOptions(els.categoryInput);
+  renderCategoryOptions(els.bulkCategoryInput);
+  renderCategoryTabs();
+}
+
+function renderCategoryTabs() {
+  if (!els.categoryTabs) return;
+  const counts = getCategoryCounts();
+  const categories = [{ id: "all", label: "全部" }, ...defaultCategories];
+  els.categoryTabs.textContent = "";
+  categories.forEach((category) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "category-tab";
+    button.dataset.category = category.id;
+    button.classList.toggle("active", state.libraryCategory === category.id);
+    button.innerHTML = `
+      <span>${escapeHtml(category.label)}</span>
+      <strong>${counts[category.id] || 0}</strong>
+    `;
+    els.categoryTabs.append(button);
+  });
+}
+
 function renderWordList() {
   state.wordListDirty = false;
   const query = els.searchInput.value.trim().toLowerCase();
+  const selectedCategory = state.libraryCategory || "all";
   const visibleWords = state.words.filter((word) => {
     if (state.settings.hideKnown && word.known) return false;
+    if (selectedCategory !== "all" && normalizeCategory(word.category) !== selectedCategory) return false;
     if (!query) return true;
-    return [word.term, word.phonetic, word.meaning, word.sentence].join(" ").toLowerCase().includes(query);
+    return [word.term, word.phonetic, word.meaning, word.sentence, getCategoryLabel(word.category)]
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
   });
+  const categoryName = selectedCategory === "all" ? "全部目录" : getCategoryLabel(selectedCategory);
+  els.libraryCategoryCount.textContent = `${categoryName} · ${visibleWords.length} 个词`;
 
   els.wordList.textContent = "";
 
   if (!visibleWords.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = state.words.length ? "没有匹配的词条。" : "词库还是空的，先添加几个常用词。";
+    empty.textContent = state.words.length ? "这个目录里暂时没有匹配的词。" : "词库还是空的，先添加几个常用词。";
     els.wordList.append(empty);
     return;
   }
@@ -999,6 +1081,7 @@ function renderWordList() {
     const displayTerm = getDisplayTerm(word);
     const displayMeaning = getDisplayMeaning(word);
     const studyDate = getCurrentStudyDate(state.plan.date);
+    const categoryLabel = getCategoryLabel(word.category);
     const assignmentLabel = word.assignedDate
       ? word.assignedDate === studyDate
         ? "今日词"
@@ -1009,9 +1092,22 @@ function renderWordList() {
       <strong>${escapeHtml(displayTerm)}</strong>
       ${word.phonetic ? `<em>${escapeHtml(word.phonetic)}</em>` : ""}
       <span>${escapeHtml(displayMeaning || (state.translatingIds.has(word.id) ? "正在自动翻译…" : "可手动补充释义"))}</span>
-      <small>${escapeHtml(assignmentLabel)}</small>
+      <small>${escapeHtml(categoryLabel)} · ${escapeHtml(assignmentLabel)}</small>
       ${word.sentence ? `<small>${escapeHtml(word.sentence)}</small>` : ""}
     `;
+    const categoryPicker = document.createElement("label");
+    categoryPicker.className = "word-category-picker";
+    categoryPicker.innerHTML = `<span>目录</span><select aria-label="选择词库目录"></select>`;
+    const categorySelect = categoryPicker.querySelector("select");
+    renderCategoryOptions(categorySelect);
+    categorySelect.value = normalizeCategory(word.category);
+    categorySelect.addEventListener("change", () => {
+      word.category = normalizeCategory(categorySelect.value);
+      state.wordListDirty = true;
+      saveWords();
+      updateScreen();
+    });
+    node.insertBefore(categoryPicker, node.querySelector(".word-actions"));
     hard.textContent = word.hard ? "难词中" : "难词";
     hard.classList.toggle("active", word.hard);
     known.textContent = word.known ? "已熟悉" : "熟悉";
@@ -1325,6 +1421,25 @@ function addWords(words) {
 
 function parseBulkText(text) {
   return parseBulkRows(text).map(createWord);
+}
+
+function renderCategoryOptions(select, { includeAll = false } = {}) {
+  if (!select) return;
+  const current = includeAll ? state.libraryCategory : normalizeCategory(select.value);
+  select.textContent = "";
+  if (includeAll) {
+    const option = document.createElement("option");
+    option.value = "all";
+    option.textContent = "全部目录";
+    select.append(option);
+  }
+  defaultCategories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category.id;
+    option.textContent = category.label;
+    select.append(option);
+  });
+  select.value = includeAll ? current || "all" : normalizeCategory(current);
 }
 
 function countBulkInputLines(text) {
@@ -1947,6 +2062,7 @@ function bindEvents() {
     try {
       let term = els.termInput.value.trim();
       const meaning = els.meaningInput.value.trim();
+      const selectedCategory = normalizeCategory(els.categoryInput.value);
       if (!term && !meaning) {
         setSingleStatus("先输入英文，或者只输入中文意思也可以。");
         return;
@@ -1959,6 +2075,7 @@ function bindEvents() {
       const word = createWord({
         term,
         meaning,
+        category: selectedCategory,
         sentence: els.sentenceInput.value,
       });
       prepareQuickAddedWord(word, getCurrentStudyDate(state.plan.date));
@@ -1967,6 +2084,7 @@ function bindEvents() {
         state.index = getPlayableWords().findIndex((item) => item.id === word.id);
         if (state.index < 0) state.index = 0;
         els.singleForm.reset();
+        els.categoryInput.value = selectedCategory;
         setMoreFields(false);
         els.termInput.focus();
         setSingleStatus(
@@ -1996,7 +2114,7 @@ function bindEvents() {
   els.bulkAddBtn.addEventListener("click", () => {
     try {
       const inputLineCount = countBulkInputLines(els.bulkInput.value);
-      const parsed = parseBulkText(els.bulkInput.value);
+      const parsed = applyCategory(parseBulkText(els.bulkInput.value), els.bulkCategoryInput.value);
       const skipped = Math.max(0, inputLineCount - parsed.length);
       const result = addWords(parsed);
       if (!result.total) {
@@ -2026,7 +2144,11 @@ function bindEvents() {
     const file = els.fileInput.files[0];
     if (!file) return;
     try {
-      const result = addWords(await parseFile(file));
+      const parsed = await parseFile(file);
+      const words = file.name.toLowerCase().endsWith(".json")
+        ? parsed
+        : applyCategory(parsed, els.bulkCategoryInput.value);
+      const result = addWords(words);
       const savedText = result.saved ? "" : " 当前打开方式不适合长期保存，建议发布成网页 App 后使用。";
       setBulkStatus(`已从文件加入 ${result.added} 个词条${result.duplicates ? `，${result.duplicates} 个已存在` : ""}。${savedText}`);
       if (result.added || result.duplicates) switchTab("library");
@@ -2038,6 +2160,14 @@ function bindEvents() {
 
   els.searchInput.addEventListener("input", () => {
     state.wordListDirty = true;
+    renderWordList();
+  });
+  els.categoryTabs.addEventListener("click", (event) => {
+    const button = event.target.closest(".category-tab");
+    if (!button) return;
+    state.libraryCategory = button.dataset.category || "all";
+    state.wordListDirty = true;
+    renderCategoryTabs();
     renderWordList();
   });
   els.exportBtn.addEventListener("click", exportWords);

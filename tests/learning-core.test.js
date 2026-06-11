@@ -35,6 +35,12 @@ describe("bulk import parsing", () => {
       ]
     );
   });
+
+  it("does not assign a category while parsing plain bulk text", () => {
+    const words = parseBulkText("command 命令");
+
+    assert.equal(words[0].category, undefined);
+  });
 });
 
 describe("daily learning pool", () => {
